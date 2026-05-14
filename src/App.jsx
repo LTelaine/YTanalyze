@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { BarChart, Bar, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
 
 // ── Theme system ──
@@ -24,39 +24,19 @@ const themes = {
 };
 
 // ── Data ──
-const rawVideos = [
-  { id:"u0Y5BEGqK4k", show:"防詐特攻隊", title:"堪比八點檔！遭閨密背叛、弟媳切割，慘被詐騙千萬", date:"2026/05/02", views:37515, watchMin:489541, subs:148, likes:567, comments:78, shares:761, avgWatch:"13:37", age:"55-64", female:66.4, male:33.6, traffic:"訂閱者", type:"完整集", guest:"王珮蓓", topic:"法律與社會案件", ep:"EP17" },
-  { id:"P2uCbBdJ1JU", show:"授ㄉㄟ私捏", title:"大腦天生不是讓你快樂！為什麼越努力越焦慮？", date:"2026/04/22", views:49129, watchMin:249411, subs:141, likes:354, comments:12, shares:791, avgWatch:"9:33", age:"45-54", female:68.8, male:31.2, traffic:"廣告", type:"完整集", guest:"朱仲翔", topic:"心理與自我成長", ep:"EP216" },
-  { id:"FXw8cDa78nI", show:"授ㄉㄟ私捏", title:"高敏感是一種病？高敏人的生存攻略", date:"2026/04/15", views:33090, watchMin:113298, subs:41, likes:141, comments:3, shares:180, avgWatch:"6:13", age:"45-54", female:75.4, male:24.6, traffic:"廣告", type:"完整集", guest:"盧美妏", topic:"心理與自我成長", ep:"EP215" },
-  { id:"qKlRAEzG7qg", show:"授ㄉㄟ私捏", title:"ETF四大種類怎麼選？佛系增長的關鍵", date:"2026/04/08", views:28938, watchMin:274028, subs:120, likes:444, comments:12, shares:407, avgWatch:"9:28", age:"45-54", female:43.1, male:56.9, traffic:"訂閱者", type:"完整集", guest:"謝晨彥", topic:"理財與房產", ep:"EP213" },
-  { id:"77XKHzI4BTQ", show:"授ㄉㄟ私捏", title:"AI時代，45+才是最強大腦！用AI效能增加100倍", date:"2026/04/29", views:25099, watchMin:23638, subs:9, likes:32, comments:0, shares:25, avgWatch:"4:25", age:"45-54", female:15.3, male:84.7, traffic:"廣告", type:"完整集", guest:"陶韻智", topic:"科技與科學", ep:"EP217" },
-  { id:"leB78Dcg_Jo", show:"防詐特攻隊", title:"外籍移工竟跟詐騙集團一夥！雇主如何自保？", date:"2026/04/04", views:22992, watchMin:126032, subs:116, likes:488, comments:79, shares:1064, avgWatch:"5:28", age:"55-64", female:60.1, male:39.9, traffic:"訂閱者", type:"完整集", guest:"洪丞奇", topic:"法律與社會案件", ep:"EP15" },
-  { id:"wDxQW7Znhe4", show:"授ㄉㄟ私捏", title:"最強0元改運法：穿對顏色、吃對食物改寫命運", date:"2026/05/06", views:8626, watchMin:111188, subs:109, likes:240, comments:10, shares:280, avgWatch:"12:53", age:"45-54", female:81.7, male:18.3, traffic:"訂閱者", type:"完整集", guest:"千里淳風", topic:"命理與占卜", ep:"EP218" },
-  { id:"_V5gJAxniWU", show:"授ㄉㄟ私捏", title:"100萬變1300萬？股怪教授曝光全自動躺平術", date:"2026/04/10", views:6296, watchMin:52301, subs:26, likes:119, comments:8, shares:128, avgWatch:"8:18", age:"45-54", female:38.9, male:61.1, traffic:"訂閱者", type:"完整集", guest:"謝晨彥", topic:"理財與房產", ep:"EP214" },
-  { id:"Kj0IiAgEEpg", show:"防詐特攻隊", title:"詐騙集團最怕冷泡茶？Deepfake詐騙3秒破解", date:"2026/04/25", views:2092, watchMin:23821, subs:6, likes:55, comments:12, shares:60, avgWatch:"11:23", age:"45-54", female:63.7, male:36.3, traffic:"訂閱者", type:"完整集", guest:"莊明雄", topic:"法律與社會案件", ep:"EP16" },
-  { id:"d465N5sOQRs", show:"防詐特攻隊", title:"破解裝潢養套殺騙局！一招逼退黑心廠商", date:"2026/03/21", views:1831, watchMin:21779, subs:7, likes:47, comments:1, shares:70, avgWatch:"11:53", age:"45-54", female:54, male:46, traffic:"訂閱者", type:"完整集", guest:"蕭琪琳、陳韋帆", topic:"法律與社會案件", ep:"EP13" },
-  { id:"ekBh9fHQn3E", show:"醫起好健康", title:"瘦瘦針腸泌素非人人都可打！2大保命關鍵", date:"2026/05/08", views:459, watchMin:3979, subs:2, likes:15, comments:0, shares:15, avgWatch:"8:40", age:"45-54", female:69.4, male:30.6, traffic:"訂閱者", type:"完整集", guest:"蕭敦仁", topic:"健康與飲食", ep:"EP3" },
-  { id:"4vQFDYEXPz4", show:"醫起好健康", title:"便便流血是痔瘡還是大腸癌？便祕該怎辦？", date:"2026/04/11", views:572, watchMin:4099, subs:0, likes:20, comments:1, shares:37, avgWatch:"7:10", age:"45-54", female:58.4, male:41.6, traffic:"訂閱者", type:"完整集", guest:"鍾雲霓", topic:"健康與飲食", ep:"EP1" },
-  { id:"8dwexuW83qw", show:"醫起好健康", title:"打呼竟然會引發心血管疾病還有陽痿？AI五分鐘檢測", date:"2026/04/18", views:256, watchMin:1360, subs:-1, likes:14, comments:0, shares:7, avgWatch:"5:18", age:"", female:0, male:0, traffic:"訂閱者", type:"完整集", guest:"林偉傑", topic:"健康與飲食", ep:"EP2" },
-  { id:"bqE3UmFiZr8", show:"授ㄉㄟ私捏", title:"為什麼你忙到死，部屬卻沒事做？新手主管必學", date:"2026/04/03", views:313, watchMin:1731, subs:-1, likes:4, comments:0, shares:10, avgWatch:"5:31", age:"", female:0, male:0, traffic:"訂閱者", type:"完整集", guest:"丹倫", topic:"職場與職涯", ep:"EP212" },
-  { id:"HZFoawi6bjE", show:"授ㄉㄟ私捏", title:"為什麼你越努力帶人，員工越想離職？五步逆轉術", date:"2026/04/01", views:555, watchMin:3055, subs:0, likes:12, comments:1, shares:17, avgWatch:"5:30", age:"25-34", female:0, male:100, traffic:"訂閱者", type:"完整集", guest:"丹倫", topic:"職場與職涯", ep:"EP211" },
-  { id:"2-EJgRg0rdw", show:"授ㄉㄟ私捏", title:"200萬訂閱一夕歸零？創作者沒看懂這條款恐賠掉整個頻道", date:"2026/03/25", views:356, watchMin:1258, subs:0, likes:7, comments:0, shares:3, avgWatch:"3:32", age:"", female:0, male:0, traffic:"訂閱者", type:"完整集", guest:"周逸濱", topic:"法律與社會案件", ep:"EP209" },
-  { id:"93vW1XYhnQk", show:"防詐特攻隊", title:"轉貼迷因、懶人包這樣做隨時可能被告", date:"2026/03/27", views:340, watchMin:1435, subs:1, likes:9, comments:0, shares:7, avgWatch:"4:13", age:"35-44", female:58.2, male:41.8, traffic:"訂閱者", type:"完整集", guest:"周逸濱", topic:"法律與社會案件", ep:"EP210" },
-  { id:"7BMDeFHSGGc", show:"防詐特攻隊", title:"AI詐騙賣假藥，名醫藝人都被冒用", date:"2026/04/02", views:411, watchMin:3074, subs:4, likes:11, comments:1, shares:14, avgWatch:"7:28", age:"35-44", female:43.5, male:56.5, traffic:"訂閱者", type:"完整集", guest:"鍾雲霓、丘祐瑋", topic:"法律與社會案件", ep:"EP14" },
-];
-
-const videos = rawVideos.map(v => {
-  const interactRate = v.views > 0 ? ((v.likes + v.comments + v.shares) / v.views * 100) : 0;
-  const subsRate = v.views > 0 ? (v.subs / v.views * 100) : 0;
-  const watchSec = v.avgWatch ? v.avgWatch.split(":").reduce((a, b, i) => a + parseInt(b) * (i === 0 ? 60 : 1), 0) : 0;
-  const watchRatio = watchSec > 0 ? Math.min(watchSec / 600, 1) : 0;
-  const commercialIdx = (0.25 * Math.min(interactRate, 10) / 10 + 0.25 * Math.min(Math.abs(subsRate) * 10, 10) / 10 + 0.3 * watchRatio + 0.2 * Math.min(v.views / 30000, 1)) * 10;
-  return { ...v, interactRate: +interactRate.toFixed(2), subsRate: +subsRate.toFixed(3), watchSec, commercialIdx: +commercialIdx.toFixed(2) };
-});
-
-const fullVideos = videos.filter(v => v.type === "完整集");
 const TABS = ["總覽", "商機指標", "12類選題", "A/B 文案", "TA 輪廓", "來賓效應", "行動建議"];
 const SHOWS = ["全部", "授ㄉㄟ私捏", "防詐特攻隊", "醫起好健康"];
+
+function processVideos(rawVideos) {
+  return rawVideos.map(v => {
+    const interactRate = v.views > 0 ? ((v.likes + v.comments + v.shares) / v.views * 100) : 0;
+    const subsRate = v.views > 0 ? (v.subs / v.views * 100) : 0;
+    const watchSec = v.avgWatch ? v.avgWatch.split(":").reduce((a, b, i) => a + parseInt(b) * (i === 0 ? 60 : 1), 0) : 0;
+    const watchRatio = watchSec > 0 ? Math.min(watchSec / 600, 1) : 0;
+    const commercialIdx = (0.25 * Math.min(interactRate, 10) / 10 + 0.25 * Math.min(Math.abs(subsRate) * 10, 10) / 10 + 0.3 * watchRatio + 0.2 * Math.min(v.views / 30000, 1)) * 10;
+    return { ...v, interactRate: +interactRate.toFixed(2), subsRate: +subsRate.toFixed(3), watchSec, commercialIdx: +commercialIdx.toFixed(2) };
+  });
+}
 
 function fmt(n) { return n >= 10000 ? (n/10000).toFixed(1) + "萬" : n >= 1000 ? (n/1000).toFixed(1) + "K" : String(n); }
 
@@ -159,7 +139,7 @@ function ThemeSwitch({ isDark, toggle, C: c }) {
 }
 
 // ── Tab: Overview ──
-function OverviewTab({ C: c }) {
+function OverviewTab({ fullVideos, C: c }) {
   const total = fullVideos.reduce((a, v) => ({ views: a.views + v.views, subs: a.subs + v.subs }), { views: 0, subs: 0 });
   const avgCIdx = (fullVideos.reduce((a, v) => a + v.commercialIdx, 0) / fullVideos.length).toFixed(1);
 
@@ -215,7 +195,7 @@ function OverviewTab({ C: c }) {
 }
 
 // ── Tab: Commercial Index ──
-function CommercialTab({ C: c }) {
+function CommercialTab({ fullVideos, C: c }) {
   const sorted = [...fullVideos].sort((a, b) => b.commercialIdx - a.commercialIdx);
   return (<div>
     <Card C={c} style={{ marginBottom: 20, borderLeft: `3px solid ${c.accent}` }}>
@@ -278,7 +258,7 @@ function CommercialTab({ C: c }) {
 }
 
 // ── Tab: 12 Topics ──
-function TopicTab({ C: c }) {
+function TopicTab({ fullVideos, C: c }) {
   const topicStats = useMemo(() => {
     const map = {};
     fullVideos.forEach(v => {
@@ -287,7 +267,7 @@ function TopicTab({ C: c }) {
       const m = map[v.topic]; m.count++; m.totalViews += v.views; m.totalSubs += v.subs; m.totalInteract += v.interactRate; m.totalWatch += v.watchSec; m.commercialSum += v.commercialIdx;
     });
     return Object.values(map).map(t => ({ ...t, avgViews: Math.round(t.totalViews / t.count), avgInteract: +(t.totalInteract / t.count).toFixed(2), avgWatchFmt: `${Math.floor(t.totalWatch / t.count / 60)}:${((t.totalWatch / t.count) % 60 | 0).toString().padStart(2, "0")}`, avgCommercial: +(t.commercialSum / t.count).toFixed(1) })).sort((a, b) => b.avgViews - a.avgViews);
-  }, []);
+  }, [fullVideos]);
 
   return (<div>
     <Section title="選題類別觀看數" sub="按弘峻 12 類分類">
@@ -324,8 +304,8 @@ function TopicTab({ C: c }) {
   </div>);
 }
 
-// ── AB Test Data (matches v3 Excel template) ──
-const abTests = [
+// ── AB Test Fallback Data ──
+const FALLBACK_AB_TESTS = [
   { ep:"EP209", show:"授ㄉㄟ私捏", topic:"法律與社會案件", copyA:"200萬訂閱一夕歸零？創作者必看", copyB:"沒看懂「這條款」恐賠掉整個頻道", ctrA:3.8, ctrB:4.5, winner:"B", frameA:"實用承諾", frameB:"好奇懸念", testVar:"情緒框架", angleA:"法律知識提醒", angleB:"風險恐懼切入", conclusion:"好奇懸念的「恐賠掉」比實用提醒更能引發點擊衝動", suggestion:"法律類持續用好奇懸念包裝風險" },
   { ep:"EP210", show:"防詐特攻隊", topic:"法律與社會案件", copyA:"轉貼迷因小心觸法！律師教你避雷", copyB:"你天天在做卻不知道違法！", ctrA:4.2, ctrB:5.6, winner:"B", frameA:"權威背書", frameB:"好奇懸念", testVar:"情緒框架", angleA:"律師專業提醒", angleB:"日常行為反差", conclusion:"「你天天在做」製造認知衝突，比律師背書更有吸引力", suggestion:"日常行為 + 違法反差是高 CTR 公式" },
   { ep:"EP213", show:"授ㄉㄟ私捏", topic:"理財與房產", copyA:"ETF 四大種類完整解析", copyB:"做好本業、放下企圖心，資產佛系增長", ctrA:5.1, ctrB:6.3, winner:"B", frameA:"實用承諾", frameB:"好奇懸念", testVar:"議題包裝", angleA:"教學型：ETF分類", angleB:"心態型：佛系理財", conclusion:"同樣好奇框架，心態故事比教學分類更吸引 45-54 TA", suggestion:"理財類用「心態轉變」包裝比「工具教學」好" },
@@ -338,7 +318,7 @@ const abTests = [
 ];
 
 // ── Tab: AB ──
-function ABTab({ C: c }) {
+function ABTab({ abTests, C: c }) {
   const [hoveredTest, setHoveredTest] = useState(null);
 
   // Stats by test variable
@@ -530,7 +510,7 @@ function ABTab({ C: c }) {
 }
 
 // ── Tab: TA ──
-function TATab({ selectedShow, C: c }) {
+function TATab({ fullVideos, selectedShow, C: c }) {
   const sv = selectedShow === "全部" ? fullVideos : fullVideos.filter(v => v.show === selectedShow);
   const wg = sv.filter(v => v.female > 0 || v.male > 0);
   const avgF = wg.length ? +(wg.reduce((a, v) => a + v.female, 0) / wg.length).toFixed(1) : 0;
@@ -567,7 +547,7 @@ function TATab({ selectedShow, C: c }) {
 }
 
 // ── Tab: Guests ──
-function GuestTab({ C: c }) {
+function GuestTab({ fullVideos, C: c }) {
   const guests = useMemo(() => {
     const map = {};
     fullVideos.filter(v => v.guest).forEach(v => {
@@ -575,7 +555,7 @@ function GuestTab({ C: c }) {
       const m = map[v.guest]; m.count++; m.totalViews += v.views; m.totalSubs += v.subs; m.shows.add(v.show); m.commercialSum += v.commercialIdx;
     });
     return Object.values(map).map(g => ({ ...g, avgViews: Math.round(g.totalViews / g.count), avgCommercial: +(g.commercialSum / g.count).toFixed(1), shows: [...g.shows].join(", ") })).sort((a, b) => b.totalViews - a.totalViews);
-  }, []);
+  }, [fullVideos]);
 
   return (<div>
     <Section title="來賓效應排行" sub="點擊欄位排序">
@@ -633,7 +613,34 @@ export default function App() {
   const [tab, setTab] = useState(0);
   const [show, setShow] = useState("全部");
   const [isDark, setIsDark] = useState(true);
+  const [rawData, setRawData] = useState(null);
   const c = isDark ? themes.dark : themes.light;
+
+  useEffect(() => {
+    fetch(import.meta.env.BASE_URL + "data.json")
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(setRawData)
+      .catch(() => setRawData(null));
+  }, []);
+
+  const { fullVideos, abTests } = useMemo(() => {
+    if (!rawData) return { fullVideos: [], abTests: FALLBACK_AB_TESTS };
+    const all = processVideos(rawData.videos || []);
+    const full = all.filter(v => v.type === "完整集");
+    const ab = rawData.abTests && rawData.abTests.length > 0 ? rawData.abTests : FALLBACK_AB_TESTS;
+    return { fullVideos: full, abTests: ab };
+  }, [rawData]);
+
+  if (!rawData) {
+    return (
+      <div style={{ background: c.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: c.textMuted, fontFamily: "'Noto Sans TC', sans-serif" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 28, marginBottom: 12, color: c.accent }}>醍醐WAY</div>
+          <div>載入數據中...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: c.bg, minHeight: "100vh", color: c.text, fontFamily: "'Noto Sans TC', sans-serif", transition: "background 0.3s, color 0.3s" }}>
@@ -642,7 +649,7 @@ export default function App() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, transition: "color 0.3s" }}><span style={{ color: c.accent }}>醍醐WAY</span> 內容分析 v3</h1>
-            <p style={{ margin: "3px 0 0", color: c.textMuted, fontSize: 12 }}>2026/02/25 — 05/14 ・ {fullVideos.length} 支完整集 ・ 表格點擊欄位可排序</p>
+            <p style={{ margin: "3px 0 0", color: c.textMuted, fontSize: 12 }}>{fullVideos.length} 支完整集 ・ 表格點擊欄位可排序</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {tab === 4 && <select value={show} onChange={e => setShow(e.target.value)} style={{ background: c.card, color: c.text, border: `1px solid ${c.border}`, borderRadius: 6, padding: "6px 12px", fontSize: 12, transition: "all 0.3s" }}>
@@ -663,12 +670,12 @@ export default function App() {
         </div>
       </div>
       <div style={{ padding: "20px 28px 60px", maxWidth: 1100, transition: "all 0.3s" }}>
-        {tab === 0 && <OverviewTab C={c} />}
-        {tab === 1 && <CommercialTab C={c} />}
-        {tab === 2 && <TopicTab C={c} />}
-        {tab === 3 && <ABTab C={c} />}
-        {tab === 4 && <TATab selectedShow={show} C={c} />}
-        {tab === 5 && <GuestTab C={c} />}
+        {tab === 0 && <OverviewTab fullVideos={fullVideos} C={c} />}
+        {tab === 1 && <CommercialTab fullVideos={fullVideos} C={c} />}
+        {tab === 2 && <TopicTab fullVideos={fullVideos} C={c} />}
+        {tab === 3 && <ABTab abTests={abTests} C={c} />}
+        {tab === 4 && <TATab fullVideos={fullVideos} selectedShow={show} C={c} />}
+        {tab === 5 && <GuestTab fullVideos={fullVideos} C={c} />}
         {tab === 6 && <ActionTab C={c} />}
       </div>
     </div>
