@@ -849,7 +849,7 @@ export default function App() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, transition: "color 0.3s" }}><span style={{ color: c.accent }}>醍醐WAY</span> 內容分析</h1>
-            <p style={{ margin: "3px 0 0", color: c.textMuted, fontSize: 12 }}>{fullVideos.length} 支完整集 ・ 表格點擊欄位可排序</p>
+            <p style={{ margin: "3px 0 0", color: c.textMuted, fontSize: 12 }}>共 {fullVideos.length} 支影片 · 點擊欄位標題可排序</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {tab === 4 && <select value={show} onChange={e => setShow(e.target.value)} style={{ background: c.card, color: c.text, border: `1px solid ${c.border}`, borderRadius: 6, padding: "6px 12px", fontSize: 12, transition: "all 0.3s" }}>
