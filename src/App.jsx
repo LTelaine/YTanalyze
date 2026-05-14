@@ -24,8 +24,60 @@ const themes = {
 };
 
 // ── Data ──
+const SHEET_ID = "17D8r63CRfxmtG5CJvyoTuECSNEPEyAEByOz0avBJaac";
 const TABS = ["總覽", "商機指標", "12類選題", "A/B 文案", "TA 輪廓", "來賓效應", "行動建議"];
 const SHOWS = ["全部", "授ㄉㄟ私捏", "防詐特攻隊", "醫起好健康"];
+
+function parseCSV(text) {
+  const rows = [];
+  let current = "", inQuote = false, row = [];
+  for (let i = 0; i <= text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      if (inQuote && text[i + 1] === '"') { current += '"'; i++; }
+      else inQuote = !inQuote;
+    } else if ((ch === ',' && !inQuote) || ch === '\n' || ch === undefined) {
+      row.push(current); current = "";
+      if (ch !== ',') { if (row.length > 1 || row[0] !== "") rows.push(row); row = []; }
+    } else if (ch !== '\r') { current += ch; }
+  }
+  return rows;
+}
+
+function csvToObjects(text) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) return [];
+  const headers = rows[0];
+  return rows.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = row[i] ?? ""; });
+    return obj;
+  });
+}
+
+async function fetchSheetCSV(sheetName) {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(res.status);
+  return res.text();
+}
+
+async function loadFromSheets() {
+  const [videosCSV, abCSV] = await Promise.all([
+    fetchSheetCSV("videos"),
+    fetchSheetCSV("abTests"),
+  ]);
+  const rawVideos = csvToObjects(videosCSV).map(v => ({
+    ...v,
+    views: +v.views || 0, watchMin: +v.watchMin || 0, subs: +v.subs || 0,
+    likes: +v.likes || 0, comments: +v.comments || 0, shares: +v.shares || 0,
+    female: +v.female || 0, male: +v.male || 0,
+  }));
+  const rawAB = csvToObjects(abCSV).filter(t => t.copyA && t.copyB).map(t => ({
+    ...t, ctrA: +t.ctrA || 0, ctrB: +t.ctrB || 0,
+  }));
+  return { videos: rawVideos, abTests: rawAB };
+}
 
 function processVideos(rawVideos) {
   return rawVideos.map(v => {
@@ -617,10 +669,14 @@ export default function App() {
   const c = isDark ? themes.dark : themes.light;
 
   useEffect(() => {
-    fetch(import.meta.env.BASE_URL + "data.json")
-      .then(r => r.ok ? r.json() : Promise.reject())
+    loadFromSheets()
       .then(setRawData)
-      .catch(() => setRawData(null));
+      .catch(() =>
+        fetch(import.meta.env.BASE_URL + "data.json")
+          .then(r => r.ok ? r.json() : Promise.reject())
+          .then(setRawData)
+          .catch(() => setRawData(null))
+      );
   }, []);
 
   const { fullVideos, abTests } = useMemo(() => {
