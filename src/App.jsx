@@ -104,7 +104,8 @@ async function loadFromSheets() {
         winner: r[col("勝出版本")] || "",
         frameA: r[col("A 情緒框架")] || "", frameB: r[col("B 情緒框架")] || "",
         testVar: r[col("測試變數")] || "",
-        angleA: r[col("A 議題角度")] || "", angleB: r[col("B 議題角度")] || "",
+        angleA: r[col("A 設計脈絡")] || "", angleB: r[col("B 設計脈絡")] || "",
+        topicAngleA: r[col("A 議題角度")] || "", topicAngleB: r[col("B 議題角度")] || "",
         conclusion: r[col("AB 結論")] || "", suggestion: r[col("未來建議")] || "",
       });
     }
@@ -651,15 +652,21 @@ function ABTab({ abTests, abSuggestions, C: c }) {
                     <div style={{ fontSize: 12, fontWeight: 600, color: c.text, marginBottom: 14 }}>{t.ep} AB 分析</div>
                     <div style={{ display: "flex", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
                       <div style={{ flex: "1 1 200px", padding: 12, background: t.winner === "A" ? c.green + "12" : c.card, borderRadius: 8, border: `1px solid ${t.winner === "A" ? c.green + "40" : c.border}` }}>
-                        <div style={{ fontSize: 10, color: c.textDim, marginBottom: 4 }}>版本 A・{t.frameA}</div>
+                        <div style={{ fontSize: 10, color: c.textDim, marginBottom: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <span>版本 A・{t.frameA}</span>
+                          {t.topicAngleA && <span style={{ color: c.accent, background: c.accent + "15", padding: "1px 6px", borderRadius: 4 }}>{t.topicAngleA}</span>}
+                        </div>
                         <div style={{ fontSize: 12, color: c.text, marginBottom: 8, lineHeight: 1.5 }}>{t.copyA}</div>
-                        {t.angleA && <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 8 }}>角度：{t.angleA}</div>}
+                        {t.angleA && <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 8 }}>設計脈絡：{t.angleA}</div>}
                         <div style={{ fontSize: 18, fontWeight: 700, color: t.winner === "A" ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{t.ctrA}%</div>
                       </div>
                       <div style={{ flex: "1 1 200px", padding: 12, background: t.winner === "B" ? c.green + "12" : c.card, borderRadius: 8, border: `1px solid ${t.winner === "B" ? c.green + "40" : c.border}` }}>
-                        <div style={{ fontSize: 10, color: c.textDim, marginBottom: 4 }}>版本 B・{t.frameB}</div>
+                        <div style={{ fontSize: 10, color: c.textDim, marginBottom: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <span>版本 B・{t.frameB}</span>
+                          {t.topicAngleB && <span style={{ color: c.accent, background: c.accent + "15", padding: "1px 6px", borderRadius: 4 }}>{t.topicAngleB}</span>}
+                        </div>
                         <div style={{ fontSize: 12, color: c.text, marginBottom: 8, lineHeight: 1.5 }}>{t.copyB}</div>
-                        {t.angleB && <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 8 }}>角度：{t.angleB}</div>}
+                        {t.angleB && <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 8 }}>設計脈絡：{t.angleB}</div>}
                         <div style={{ fontSize: 18, fontWeight: 700, color: t.winner === "B" ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{t.ctrB}%</div>
                       </div>
                     </div>
