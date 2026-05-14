@@ -36,9 +36,10 @@ function parseCSV(text) {
     if (ch === '"') {
       if (inQuote && text[i + 1] === '"') { current += '"'; i++; }
       else inQuote = !inQuote;
-    } else if ((ch === ',' && !inQuote) || ch === '\n' || ch === undefined) {
+    } else if ((ch === ',' && !inQuote) || (ch === '\n' && !inQuote) || ch === undefined) {
       row.push(current); current = "";
       if (ch !== ',') { if (row.length > 1 || row[0] !== "") rows.push(row); row = []; }
+    } else if (ch === '\n' && inQuote) { current += '\n';
     } else if (ch !== '\r') { current += ch; }
   }
   return rows;
@@ -648,7 +649,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
               {b.items.map((item, j) => (
                 <div key={j} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
                   <span style={{ color: b.color, fontSize: 8, marginTop: 5 }}>●</span>
-                  <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6 }}>{item}</span>
+                  <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{item}</span>
                 </div>
               ))}
             </Card>
