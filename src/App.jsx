@@ -267,6 +267,40 @@ function ThemeSwitch({ isDark, toggle, C: c }) {
   );
 }
 
+// ── Font Size Control ──
+function FontSizeControl({ value, onChange, C: c }) {
+  const opts = [{ key: "small", label: "A", fs: 10 }, { key: "medium", label: "A", fs: 13 }, { key: "large", label: "A", fs: 16 }];
+  return (
+    <div style={{ display: "flex", alignItems: "center", border: `1px solid ${c.border}`, borderRadius: 6, overflow: "hidden" }}>
+      {opts.map(o => (
+        <button key={o.key} onClick={() => onChange(o.key)} style={{
+          background: value === o.key ? c.accent + "20" : "none", border: "none",
+          borderRight: `1px solid ${c.border}`, color: value === o.key ? c.accent : c.textMuted,
+          padding: "4px 8px", cursor: "pointer", fontWeight: 700, fontFamily: "serif",
+          fontSize: o.fs, lineHeight: 1, transition: "all 0.15s",
+        }}>{o.label}</button>
+      ))}
+    </div>
+  );
+}
+
+// ── Width Switch ──
+function WidthSwitch({ isFullWidth, toggle, C: c }) {
+  return (
+    <button onClick={toggle} title={isFullWidth ? "切換為置中版面" : "切換為滿版"} style={{
+      display: "flex", alignItems: "center", gap: 5,
+      background: isFullWidth ? c.accent + "18" : "none",
+      border: `1px solid ${isFullWidth ? c.accent : c.border}`,
+      borderRadius: 6, color: isFullWidth ? c.accent : c.textMuted,
+      padding: "4px 10px", cursor: "pointer", fontSize: 11,
+      fontFamily: "'Noto Sans TC', sans-serif", transition: "all 0.2s", whiteSpace: "nowrap",
+    }}>
+      <span style={{ fontSize: 14, lineHeight: 1 }}>{isFullWidth ? "⊡" : "⊞"}</span>
+      <span>{isFullWidth ? "滿版" : "置中"}</span>
+    </button>
+  );
+}
+
 // ── Tab: Overview ──
 function OverviewTab({ fullVideos, C: c }) {
   const total = fullVideos.reduce((a, v) => ({ views: a.views + v.views, subs: a.subs + v.subs }), { views: 0, subs: 0 });
@@ -764,6 +798,9 @@ export default function App() {
   const [tab, setTab] = useState(0);
   const [show, setShow] = useState("全部");
   const [isDark, setIsDark] = useState(false);
+  const [fontSize, setFontSize] = useState("medium");
+  const [isFullWidth, setIsFullWidth] = useState(false);
+  const zoomMap = { small: 0.88, medium: 1, large: 1.12 };
   const [rawData, setRawData] = useState(null);
   const c = isDark ? themes.dark : themes.light;
 
@@ -798,19 +835,21 @@ export default function App() {
   }
 
   return (
-    <div style={{ background: c.bg, minHeight: "100vh", color: c.text, fontFamily: "'Noto Sans TC', sans-serif", transition: "background 0.3s, color 0.3s" }}>
+    <div style={{ background: c.bg, minHeight: "100vh", color: c.text, fontFamily: "'Noto Sans TC', sans-serif", transition: "background 0.3s, color 0.3s", zoom: zoomMap[fontSize] }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <div style={{ borderBottom: `1px solid ${c.border}` }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 28px 0" }}>
+      <div style={{ maxWidth: isFullWidth ? "none" : 1100, margin: isFullWidth ? 0 : "0 auto", padding: "24px 28px 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, transition: "color 0.3s" }}><span style={{ color: c.accent }}>醍醐WAY</span> 內容分析</h1>
             <p style={{ margin: "3px 0 0", color: c.textMuted, fontSize: 12 }}>{fullVideos.length} 支完整集 ・ 表格點擊欄位可排序</p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {tab === 4 && <select value={show} onChange={e => setShow(e.target.value)} style={{ background: c.card, color: c.text, border: `1px solid ${c.border}`, borderRadius: 6, padding: "6px 12px", fontSize: 12, transition: "all 0.3s" }}>
               {SHOWS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>}
+            <FontSizeControl value={fontSize} onChange={setFontSize} C={c} />
+            <WidthSwitch isFullWidth={isFullWidth} toggle={() => setIsFullWidth(!isFullWidth)} C={c} />
             <ThemeSwitch isDark={isDark} toggle={() => setIsDark(!isDark)} C={c} />
           </div>
         </div>
@@ -826,7 +865,7 @@ export default function App() {
         </div>
       </div>
       </div>
-      <div style={{ padding: "20px 28px 60px", maxWidth: 1100, margin: "0 auto", transition: "all 0.3s" }}>
+      <div style={{ padding: "20px 28px 60px", maxWidth: isFullWidth ? "none" : 1100, margin: isFullWidth ? 0 : "0 auto", transition: "all 0.3s" }}>
         {tab === 0 && <OverviewTab fullVideos={fullVideos} C={c} />}
         {tab === 1 && <CommercialTab fullVideos={fullVideos} formulaConfig={formulaConfig} C={c} />}
         {tab === 2 && <TopicTab fullVideos={fullVideos} C={c} />}
