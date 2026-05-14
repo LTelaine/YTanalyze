@@ -56,7 +56,7 @@ function csvToObjects(text) {
 }
 
 async function loadFromSheets() {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent("影片數據")}`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent("影片數據")}&headers=1`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(res.status);
   const rows = parseCSV(await res.text());
