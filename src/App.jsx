@@ -97,7 +97,7 @@ async function loadFromSheets() {
     const copyA = r[col("縮圖文案 A")], copyB = r[col("縮圖文案 B")];
     if (copyA && copyB) {
       abTests.push({
-        ep: r[col("集數")] || "", show: r[col("節目名稱")] || "",
+        ep: r[col("集數")] || "", show: r[col("節目名稱")] || "", date: r[col("上架時間")] || "",
         topic: r[col("選題類別")] || r[col("選題大類")] || "",
         copyA, copyB,
         ctrA: parsePct(r[col("A 點擊率")]), ctrB: parsePct(r[col("B 點擊率")]),
@@ -345,7 +345,7 @@ function OverviewTab({ fullVideos, C: c }) {
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
             <td style={{ padding: "10px 14px", color: c.textDim }}>{i + 1}</td>
             <td style={{ padding: "10px 14px" }}><Tag text={v.show} color={c.colors6[SHOWS.indexOf(v.show) % 6]} C={c} /></td>
-            <td style={{ padding: "10px 14px", color: c.textMuted }}>{v.ep}</td>
+            <td title={v.date} style={{ padding: "10px 14px", color: c.textMuted, cursor: "help" }}>{v.ep}</td>
             <td title={v.title} style={{ padding: "10px 14px", color: c.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "default" }}>{v.title}</td>
             <td style={{ padding: "10px 14px", color: c.textMuted, fontSize: 11, whiteSpace: "nowrap" }}>{v.traffic}</td>
             <td style={{ padding: "10px 14px", color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(v.views)}</td>
@@ -427,7 +427,7 @@ function CommercialTab({ fullVideos, formulaConfig: cfg = {}, C: c }) {
         data={fullVideos}
         renderRow={(v, i) => (
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
-            <td style={{ padding: "10px 14px", color: c.text, fontWeight: 500 }}>{v.ep}</td>
+            <td title={v.date} style={{ padding: "10px 14px", color: c.text, fontWeight: 500, cursor: "help" }}>{v.ep}</td>
             <td style={{ padding: "10px 14px" }}><Tag text={v.show} color={c.colors6[SHOWS.indexOf(v.show) % 6]} C={c} /></td>
             <td style={{ padding: "10px 14px", color: c.textMuted }}>{v.guest}</td>
             <td style={{ padding: "10px 14px", color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(v.views)}</td>
@@ -610,7 +610,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
           const isExpanded = expandedRow === t.ep;
           return [
             <tr key={t.ep} style={{ borderBottom: isExpanded ? "none" : `1px solid ${c.border}`, background: isExpanded ? c.sortHover : "transparent", transition: "background 0.15s" }}>
-              <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500 }}>{t.ep}</td>
+              <td title={t.date} style={{ padding: "12px 14px", color: c.text, fontWeight: 500, cursor: "help" }}>{t.ep}</td>
               <td style={{ padding: "12px 14px" }}><Tag text={t.show} color={c.colors6[SHOWS.indexOf(t.show) % 6]} C={c} /></td>
               <td style={{ padding: "12px 14px" }}><Tag text={t.testVar} color={t.testVar === "情緒框架" ? c.purple : t.testVar === "議題包裝" ? c.teal : c.coral} C={c} /></td>
               <td title={t.copyA} style={{ padding: "12px 14px", color: t.winner === "A" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "default" }}>{t.copyA}</td>
