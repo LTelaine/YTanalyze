@@ -24,7 +24,7 @@ const themes = {
 };
 
 // ── Data ──
-const SHEET_ID = "17D8r63CRfxmtG5CJvyoTuECSNEPEyAEByOz0avBJaac";
+const SHEET_ID = "10Eh6MhCHdcDFi-d1WHbYJS_sbsSUkxNctDNcc3kum9Y";
 const TABS = ["總覽", "商機指標", "12類選題", "A/B 文案", "TA 輪廓", "來賓效應", "行動建議"];
 const SHOWS = ["全部", "授ㄉㄟ私捏", "防詐特攻隊", "醫起好健康"];
 
@@ -55,28 +55,51 @@ function csvToObjects(text) {
   });
 }
 
-async function fetchSheetCSV(sheetName) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+async function loadFromSheets() {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent("影片數據")}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(res.status);
-  return res.text();
-}
+  const rows = parseCSV(await res.text());
+  if (rows.length < 3) throw new Error("empty");
 
-async function loadFromSheets() {
-  const [videosCSV, abCSV] = await Promise.all([
-    fetchSheetCSV("videos"),
-    fetchSheetCSV("abTests"),
-  ]);
-  const rawVideos = csvToObjects(videosCSV).map(v => ({
-    ...v,
-    views: +v.views || 0, watchMin: +v.watchMin || 0, subs: +v.subs || 0,
-    likes: +v.likes || 0, comments: +v.comments || 0, shares: +v.shares || 0,
-    female: +v.female || 0, male: +v.male || 0,
-  }));
-  const rawAB = csvToObjects(abCSV).filter(t => t.copyA && t.copyB).map(t => ({
-    ...t, ctrA: +t.ctrA || 0, ctrB: +t.ctrB || 0,
-  }));
-  return { videos: rawVideos, abTests: rawAB };
+  const H = rows[0];
+  const col = (name) => H.indexOf(name);
+  const dataRows = rows.slice(2);
+
+  const videos = [], abTests = [];
+  for (const r of dataRows) {
+    const id = r[col("影片 ID")];
+    if (!id) continue;
+    videos.push({
+      id, show: r[col("節目名稱")] || "", title: r[col("影片標題")] || "",
+      date: r[col("上架時間")] || "",
+      views: +r[col("觀看次數")] || 0, watchMin: +r[col("預估觀看分鐘")] || 0,
+      subs: +r[col("訂閱增減")] || 0, likes: +r[col("按讚數")] || 0,
+      comments: +r[col("留言數")] || 0, shares: +r[col("分享數")] || 0,
+      avgWatch: r[col("平均觀看時長")] || "0:00",
+      age: r[col("主要年齡層")] || "", female: +r[col("女性比例 %")] || 0,
+      male: +r[col("男性比例 %")] || 0, traffic: r[col("主要流量來源")] || "N/A",
+      type: r[col("影片類型")] || "完整集", guest: r[col("來賓姓名")] || "",
+      topic: r[col("選題大類")] || r[col("選題類別")] || "未分類",
+      ep: r[col("集數")] || "",
+    });
+
+    const copyA = r[col("縮圖文案 A")], copyB = r[col("縮圖文案 B")];
+    if (copyA && copyB) {
+      abTests.push({
+        ep: r[col("集數")] || "", show: r[col("節目名稱")] || "",
+        topic: r[col("選題類別")] || r[col("選題大類")] || "",
+        copyA, copyB,
+        ctrA: +r[col("A 點擊率")] || 0, ctrB: +r[col("B 點擊率")] || 0,
+        winner: r[col("勝出版本")] || "",
+        frameA: r[col("A 情緒框架")] || "", frameB: r[col("B 情緒框架")] || "",
+        testVar: r[col("測試變數")] || "",
+        angleA: r[col("A 議題角度")] || "", angleB: r[col("B 議題角度")] || "",
+        conclusion: r[col("AB 結論")] || "", suggestion: r[col("未來建議")] || "",
+      });
+    }
+  }
+  return { videos, abTests };
 }
 
 function processVideos(rawVideos) {
