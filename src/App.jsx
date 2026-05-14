@@ -99,7 +99,26 @@ async function loadFromSheets() {
       });
     }
   }
-  return { videos, abTests };
+  let abSuggestions = [];
+  try {
+    const suggUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent("AB建議")}&headers=1`;
+    const suggRes = await fetch(suggUrl);
+    if (suggRes.ok) {
+      const suggRows = parseCSV(await suggRes.text());
+      if (suggRows.length >= 2) {
+        const sh = suggRows[0];
+        const bCol = sh.indexOf("區塊"), iCol = sh.indexOf("建議內容");
+        if (bCol !== -1 && iCol !== -1) {
+          suggRows.slice(1).forEach(r => {
+            const block = r[bCol], item = r[iCol];
+            if (block && item) abSuggestions.push({ block, item });
+          });
+        }
+      }
+    }
+  } catch (e) {}
+
+  return { videos, abTests, abSuggestions };
 }
 
 function processVideos(rawVideos) {
@@ -393,7 +412,16 @@ const FALLBACK_AB_TESTS = [
 ];
 
 // ── Tab: AB ──
-function ABTab({ abTests, C: c }) {
+function ABTab({ abTests, abSuggestions, C: c }) {
+  const BLOCK_COLORS = { "框架策略": c.accent, "議題包裝": c.teal, "下次測試方向": c.purple };
+  const suggBlocks = useMemo(() => {
+    const map = {};
+    (abSuggestions || []).forEach(({ block, item }) => {
+      if (!map[block]) map[block] = [];
+      map[block].push(item);
+    });
+    return Object.entries(map).map(([title, items]) => ({ title, items, color: BLOCK_COLORS[title] || c.accent }));
+  }, [abSuggestions]);
   const [hoveredTest, setHoveredTest] = useState(null);
 
   // Stats by test variable
@@ -546,41 +574,23 @@ function ABTab({ abTests, C: c }) {
       />
     </Section>
 
-    {/* Future Recommendations */}
-    <Section title="未來 AB Test 建議" sub="根據歷史數據推導的下一步方向">
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
-        {[
-          { title: "框架策略", color: c.accent, items: [
-            "「好奇懸念」勝率最高，作為所有節目的預設框架",
-            "「情感共鳴」在防詐故事類有爆發力（EP17 CTR 差距 3.1%），但使用場景有限",
-            "「實用承諾」作為 A 版對照組效果穩定，但幾乎不會勝出",
-            "「權威背書」適合作為輔助元素放在描述欄，不適合作為標題主框架",
-          ]},
-          { title: "議題包裝", color: c.teal, items: [
-            "理財類：「心態轉變故事」> 「工具教學分類」",
-            "心理類：「認知顛覆」>「解決方案」，解法放影片內不放標題",
-            "防詐類：「真實八點檔故事」> 「SOP 教學」",
-            "所有類別：具體數字（金額、倍數、百分比）能顯著提高 CTR",
-          ]},
-          { title: "下次測試方向", color: c.purple, items: [
-            "醫起好健康還沒做過 AB test，優先測「權威背書 vs 好奇懸念」",
-            "防詐類測試「恐懼損失 vs 情感共鳴」，看哪個天花板更高",
-            "嘗試「社會認同」框架（尚未測試過），例如「百萬人都在問的…」",
-            "固定每期只改一個變數（議題或情緒），避免混合測試干擾結論",
-          ]},
-        ].map(b => (
-          <Card key={b.title} C={c} style={{ borderTop: `3px solid ${b.color}` }}>
-            <div style={{ color: b.color, fontSize: 14, fontWeight: 600, marginBottom: 14 }}>{b.title}</div>
-            {b.items.map((item, j) => (
-              <div key={j} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-                <span style={{ color: b.color, fontSize: 8, marginTop: 5 }}>●</span>
-                <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6 }}>{item}</span>
-              </div>
-            ))}
-          </Card>
-        ))}
-      </div>
-    </Section>
+    {suggBlocks.length > 0 && (
+      <Section title="未來 AB Test 建議" sub="根據歷史數據推導的下一步方向">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+          {suggBlocks.map(b => (
+            <Card key={b.title} C={c} style={{ borderTop: `3px solid ${b.color}` }}>
+              <div style={{ color: b.color, fontSize: 14, fontWeight: 600, marginBottom: 14 }}>{b.title}</div>
+              {b.items.map((item, j) => (
+                <div key={j} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                  <span style={{ color: b.color, fontSize: 8, marginTop: 5 }}>●</span>
+                  <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6 }}>{item}</span>
+                </div>
+              ))}
+            </Card>
+          ))}
+        </div>
+      </Section>
+    )}
   </div>);
 }
 
@@ -702,12 +712,11 @@ export default function App() {
       );
   }, []);
 
-  const { fullVideos, abTests } = useMemo(() => {
-    if (!rawData) return { fullVideos: [], abTests: FALLBACK_AB_TESTS };
+  const { fullVideos, abTests, abSuggestions } = useMemo(() => {
+    if (!rawData) return { fullVideos: [], abTests: [], abSuggestions: [] };
     const all = processVideos(rawData.videos || []);
     const full = all.filter(v => v.type === "完整集");
-    const ab = rawData.abTests && rawData.abTests.length > 0 ? rawData.abTests : FALLBACK_AB_TESTS;
-    return { fullVideos: full, abTests: ab };
+    return { fullVideos: full, abTests: rawData.abTests || [], abSuggestions: rawData.abSuggestions || [] };
   }, [rawData]);
 
   if (!rawData) {
@@ -724,10 +733,11 @@ export default function App() {
   return (
     <div style={{ background: c.bg, minHeight: "100vh", color: c.text, fontFamily: "'Noto Sans TC', sans-serif", transition: "background 0.3s, color 0.3s" }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <div style={{ padding: "24px 28px 0", borderBottom: `1px solid ${c.border}` }}>
+      <div style={{ borderBottom: `1px solid ${c.border}` }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 28px 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, transition: "color 0.3s" }}><span style={{ color: c.accent }}>醍醐WAY</span> 內容分析 v3</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, transition: "color 0.3s" }}><span style={{ color: c.accent }}>醍醐WAY</span> 內容分析</h1>
             <p style={{ margin: "3px 0 0", color: c.textMuted, fontSize: 12 }}>{fullVideos.length} 支完整集 ・ 表格點擊欄位可排序</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -748,11 +758,12 @@ export default function App() {
           ))}
         </div>
       </div>
-      <div style={{ padding: "20px 28px 60px", maxWidth: 1100, transition: "all 0.3s" }}>
+      </div>
+      <div style={{ padding: "20px 28px 60px", maxWidth: 1100, margin: "0 auto", transition: "all 0.3s" }}>
         {tab === 0 && <OverviewTab fullVideos={fullVideos} C={c} />}
         {tab === 1 && <CommercialTab fullVideos={fullVideos} C={c} />}
         {tab === 2 && <TopicTab fullVideos={fullVideos} C={c} />}
-        {tab === 3 && <ABTab abTests={abTests} C={c} />}
+        {tab === 3 && <ABTab abTests={abTests} abSuggestions={abSuggestions} C={c} />}
         {tab === 4 && <TATab fullVideos={fullVideos} selectedShow={show} C={c} />}
         {tab === 5 && <GuestTab fullVideos={fullVideos} C={c} />}
         {tab === 6 && <ActionTab C={c} />}
