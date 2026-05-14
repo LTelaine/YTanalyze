@@ -301,16 +301,17 @@ function OverviewTab({ fullVideos, C: c }) {
         )}
       />
     </Section>
-    <Section title="觀看數 Top 10" sub="點擊欄位標題可排序">
-      <SortableTable C={c} headers={["#", "節目", "集數", "標題", "觀看", "訂閱", "互動率", "商機"]}
-        dataKeys={[null, "show", "ep", "title", "views", "subs", "interactRate", "commercialIdx"]}
+    <Section title="觀看數 Top 10" sub="點擊欄位標題可排序 ・ 滑鼠移到標題可看完整文字">
+      <SortableTable C={c} headers={["#", "節目", "集數", "標題", "流量來源", "觀看", "訂閱", "互動率", "商機"]}
+        dataKeys={[null, "show", "ep", "title", "traffic", "views", "subs", "interactRate", "commercialIdx"]}
         data={fullVideos}
         renderRow={(v, i) => (
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
             <td style={{ padding: "10px 14px", color: c.textDim }}>{i + 1}</td>
             <td style={{ padding: "10px 14px" }}><Tag text={v.show} color={c.colors6[SHOWS.indexOf(v.show) % 6]} C={c} /></td>
             <td style={{ padding: "10px 14px", color: c.textMuted }}>{v.ep}</td>
-            <td style={{ padding: "10px 14px", color: c.text, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.title}</td>
+            <td title={v.title} style={{ padding: "10px 14px", color: c.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "default" }}>{v.title}</td>
+            <td style={{ padding: "10px 14px", color: c.textMuted, fontSize: 11, whiteSpace: "nowrap" }}>{v.traffic}</td>
             <td style={{ padding: "10px 14px", color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(v.views)}</td>
             <td style={{ padding: "10px 14px", color: c.green, fontFamily: "'JetBrains Mono', monospace" }}>+{v.subs}</td>
             <td style={{ padding: "10px 14px", color: c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{v.interactRate}%</td>
