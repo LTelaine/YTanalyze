@@ -55,6 +55,15 @@ function csvToObjects(text) {
   });
 }
 
+function parsePct(v) {
+  if (!v) return 0;
+  const s = String(v).trim();
+  if (s.endsWith('%')) return parseFloat(s) || 0;
+  const n = parseFloat(s);
+  if (isNaN(n)) return 0;
+  return n > 0 && n < 1 ? +(n * 100).toFixed(2) : +n.toFixed(2);
+}
+
 async function loadFromSheets() {
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent("影片數據")}&headers=1`;
   const res = await fetch(url);
@@ -90,7 +99,7 @@ async function loadFromSheets() {
         ep: r[col("集數")] || "", show: r[col("節目名稱")] || "",
         topic: r[col("選題類別")] || r[col("選題大類")] || "",
         copyA, copyB,
-        ctrA: +r[col("A 點擊率")] || 0, ctrB: +r[col("B 點擊率")] || 0,
+        ctrA: parsePct(r[col("A 點擊率")]), ctrB: parsePct(r[col("B 點擊率")]),
         winner: r[col("勝出版本")] || "",
         frameA: r[col("A 情緒框架")] || "", frameB: r[col("B 情緒框架")] || "",
         testVar: r[col("測試變數")] || "",
@@ -118,16 +127,41 @@ async function loadFromSheets() {
     }
   } catch (e) {}
 
-  return { videos, abTests, abSuggestions };
+  let formulaConfig = {};
+  try {
+    const cfgUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent("公式設定")}&headers=1`;
+    const cfgRes = await fetch(cfgUrl);
+    if (cfgRes.ok) {
+      const cfgRows = parseCSV(await cfgRes.text());
+      if (cfgRows.length >= 2) {
+        const ch = cfgRows[0];
+        const pCol = ch.indexOf("參數"), vCol = ch.indexOf("數值");
+        if (pCol !== -1 && vCol !== -1) {
+          cfgRows.slice(1).forEach(r => {
+            const param = r[pCol], val = r[vCol];
+            if (param && val !== "") formulaConfig[param] = isNaN(+val) ? val : +val;
+          });
+        }
+      }
+    }
+  } catch (e) {}
+
+  return { videos, abTests, abSuggestions, formulaConfig };
 }
 
-function processVideos(rawVideos) {
+function processVideos(rawVideos, cfg = {}) {
+  const w1 = +(cfg["互動率權重"] ?? 0.25);
+  const w2 = +(cfg["訂閱轉換率權重"] ?? 0.25);
+  const w3 = +(cfg["觀看時長比權重"] ?? 0.30);
+  const w4 = +(cfg["觀看規模權重"] ?? 0.20);
+  const iMax = +(cfg["互動率滿分%"] ?? 10);
+  const vMax = +(cfg["觀看規模基準"] ?? 30000);
   return rawVideos.map(v => {
     const interactRate = v.views > 0 ? ((v.likes + v.comments + v.shares) / v.views * 100) : 0;
     const subsRate = v.views > 0 ? (v.subs / v.views * 100) : 0;
     const watchSec = v.avgWatch ? v.avgWatch.split(":").reduce((a, b, i) => a + parseInt(b) * (i === 0 ? 60 : 1), 0) : 0;
     const watchRatio = watchSec > 0 ? Math.min(watchSec / 600, 1) : 0;
-    const commercialIdx = (0.25 * Math.min(interactRate, 10) / 10 + 0.25 * Math.min(Math.abs(subsRate) * 10, 10) / 10 + 0.3 * watchRatio + 0.2 * Math.min(v.views / 30000, 1)) * 10;
+    const commercialIdx = (w1 * Math.min(interactRate, iMax) / iMax + w2 * Math.min(Math.abs(subsRate) * 10, 10) / 10 + w3 * watchRatio + w4 * Math.min(v.views / vMax, 1)) * 10;
     return { ...v, interactRate: +interactRate.toFixed(2), subsRate: +subsRate.toFixed(3), watchSec, commercialIdx: +commercialIdx.toFixed(2) };
   });
 }
@@ -289,12 +323,32 @@ function OverviewTab({ fullVideos, C: c }) {
 }
 
 // ── Tab: Commercial Index ──
-function CommercialTab({ fullVideos, C: c }) {
+function CommercialTab({ fullVideos, formulaConfig: cfg = {}, C: c }) {
+  const w1 = +(cfg["互動率權重"] ?? 0.25);
+  const w2 = +(cfg["訂閱轉換率權重"] ?? 0.25);
+  const w3 = +(cfg["觀看時長比權重"] ?? 0.30);
+  const w4 = +(cfg["觀看規模權重"] ?? 0.20);
+  const iMax = +(cfg["互動率滿分%"] ?? 10);
+  const vMax = +(cfg["觀看規模基準"] ?? 30000);
   const sorted = [...fullVideos].sort((a, b) => b.commercialIdx - a.commercialIdx);
   return (<div>
     <Card C={c} style={{ marginBottom: 20, borderLeft: `3px solid ${c.accent}` }}>
-      <div style={{ color: c.textMuted, fontSize: 12, marginBottom: 6 }}>商機指標公式（等 CTR 補上後升級為完整五維版）</div>
-      <div style={{ color: c.text, fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>0.25×互動率 + 0.25×訂閱轉換率 + 0.30×觀看時間比 + 0.20×觀看規模</div>
+      <div style={{ color: c.textMuted, fontSize: 12, marginBottom: 6 }}>商機指標公式 ・ 權重可在 Google Sheet「公式設定」tab 調整</div>
+      <div style={{ color: c.text, fontSize: 13, fontFamily: "'JetBrains Mono', monospace", marginBottom: 8 }}>
+        {w1}×互動率 + {w2}×訂閱轉換率 + {w3}×觀看時長比 + {w4}×觀看規模
+      </div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        {[
+          { label: "互動率滿分基準", value: `${iMax}%`, hint: "(按讚+留言+分享)÷觀看" },
+          { label: "觀看規模基準", value: `${vMax.toLocaleString()} 次`, hint: "達此觀看數視為滿分" },
+        ].map(({ label, value, hint }) => (
+          <div key={label} style={{ fontSize: 11, color: c.textDim }}>
+            <span style={{ color: c.textMuted }}>{label}：</span>
+            <span style={{ color: c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{value}</span>
+            <span style={{ marginLeft: 6 }}>({hint})</span>
+          </div>
+        ))}
+      </div>
     </Card>
     <Section title="商機排行">
       <Card C={c}>
@@ -422,7 +476,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
     });
     return Object.entries(map).map(([title, items]) => ({ title, items, color: BLOCK_COLORS[title] || c.accent }));
   }, [abSuggestions]);
-  const [hoveredTest, setHoveredTest] = useState(null);
+  const [expandedRow, setExpandedRow] = useState(null);
 
   // Stats by test variable
   const varStats = useMemo(() => {
@@ -508,24 +562,23 @@ function ABTab({ abTests, abSuggestions, C: c }) {
       </div>
     </Section>
 
-    {/* AB Test Detail Table with CTR bar comparison and tooltip */}
-    <Section title="每次測試詳情" sub="點擊欄位排序 ・ 滑鼠移到 CTR 對比條上看 AB 分析">
+    {/* AB Test Detail Table */}
+    <Section title="每次測試詳情" sub="點擊欄位標題排序 ・ 點「更多分析」展開詳細說明">
       <SortableTable C={c}
-        headers={["集數", "節目", "測試變數", "A 文案", "B 文案", "CTR 對比", "差距", "勝出"]}
-        dataKeys={["ep", "show", "testVar", "copyA", "copyB", null, "gap", "winner"]}
+        headers={["集數", "節目", "測試變數", "A 文案", "B 文案", "CTR 對比", "差距", "勝出", ""]}
+        dataKeys={["ep", "show", "testVar", "copyA", "copyB", null, "gap", "winner", null]}
         data={abTests.map(t => ({ ...t, gap: +(t.ctrB - t.ctrA).toFixed(1) }))}
         renderRow={(t, i) => {
-          const maxCTR = Math.max(t.ctrA, t.ctrB);
-          const isHovered = hoveredTest === t.ep;
-          return (
-            <tr key={t.ep} style={{ borderBottom: `1px solid ${c.border}`, background: isHovered ? c.sortHover : "transparent", transition: "background 0.15s" }}>
+          const maxCTR = Math.max(t.ctrA, t.ctrB) || 1;
+          const isExpanded = expandedRow === t.ep;
+          return [
+            <tr key={t.ep} style={{ borderBottom: isExpanded ? "none" : `1px solid ${c.border}`, background: isExpanded ? c.sortHover : "transparent", transition: "background 0.15s" }}>
               <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500 }}>{t.ep}</td>
               <td style={{ padding: "12px 14px" }}><Tag text={t.show} color={c.colors6[SHOWS.indexOf(t.show) % 6]} C={c} /></td>
               <td style={{ padding: "12px 14px" }}><Tag text={t.testVar} color={t.testVar === "情緒框架" ? c.purple : t.testVar === "議題包裝" ? c.teal : c.coral} C={c} /></td>
               <td style={{ padding: "12px 14px", color: t.winner === "A" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.copyA}</td>
               <td style={{ padding: "12px 14px", color: t.winner === "B" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.copyB}</td>
-              <td style={{ padding: "12px 14px", minWidth: 160, position: "relative" }}
-                onMouseEnter={() => setHoveredTest(t.ep)} onMouseLeave={() => setHoveredTest(null)}>
+              <td style={{ padding: "12px 14px", minWidth: 160 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ color: c.textDim, fontSize: 9, width: 12 }}>A</span>
@@ -540,36 +593,47 @@ function ABTab({ abTests, abSuggestions, C: c }) {
                     </div>
                   </div>
                 </div>
-                {/* Tooltip on hover */}
-                {isHovered && (
-                  <div style={{
-                    position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)",
-                    background: c.card, border: `1px solid ${c.border}`, borderRadius: 10, padding: 16,
-                    width: 320, zIndex: 50, boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
-                  }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: c.text, marginBottom: 10 }}>{t.ep} AB 分析</div>
-                    <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                      <div style={{ flex: 1, padding: 8, background: t.winner === "A" ? c.green + "12" : c.bg2, borderRadius: 6, border: `1px solid ${t.winner === "A" ? c.green + "30" : c.border}` }}>
-                        <div style={{ fontSize: 9, color: c.textDim, marginBottom: 3 }}>A・{t.frameA}</div>
-                        <div style={{ fontSize: 11, color: c.text, marginBottom: 4 }}>{t.angleA}</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: t.winner === "A" ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{t.ctrA}%</div>
-                      </div>
-                      <div style={{ flex: 1, padding: 8, background: t.winner === "B" ? c.green + "12" : c.bg2, borderRadius: 6, border: `1px solid ${t.winner === "B" ? c.green + "30" : c.border}` }}>
-                        <div style={{ fontSize: 9, color: c.textDim, marginBottom: 3 }}>B・{t.frameB}</div>
-                        <div style={{ fontSize: 11, color: c.text, marginBottom: 4 }}>{t.angleB}</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: t.winner === "B" ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{t.ctrB}%</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 11, color: c.accent, lineHeight: 1.5, marginBottom: 6 }}>結論：{t.conclusion}</div>
-                    <div style={{ fontSize: 10, color: c.textMuted, lineHeight: 1.5 }}>建議：{t.suggestion}</div>
-                    <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%) rotate(45deg)", width: 10, height: 10, background: c.card, borderRight: `1px solid ${c.border}`, borderBottom: `1px solid ${c.border}` }} />
-                  </div>
-                )}
               </td>
               <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: t.gap > 2 ? c.green : t.gap > 1 ? c.accent : c.textMuted, fontWeight: 600 }}>+{Math.abs(t.gap).toFixed(1)}%</td>
               <td style={{ padding: "12px 14px" }}><span style={{ background: c.green + "18", color: c.green, padding: "2px 10px", borderRadius: 10, fontSize: 11, fontWeight: 600 }}>{t.winner}</span></td>
-            </tr>
-          );
+              <td style={{ padding: "12px 14px" }}>
+                <button onClick={() => setExpandedRow(isExpanded ? null : t.ep)} style={{
+                  background: isExpanded ? c.accent + "18" : "none",
+                  border: `1px solid ${isExpanded ? c.accent : c.border}`,
+                  borderRadius: 6, color: isExpanded ? c.accent : c.textMuted,
+                  cursor: "pointer", padding: "4px 10px", fontSize: 11,
+                  fontFamily: "'Noto Sans TC', sans-serif", whiteSpace: "nowrap", transition: "all 0.15s",
+                }}>
+                  {isExpanded ? "▲ 收起" : "更多分析 ▼"}
+                </button>
+              </td>
+            </tr>,
+            isExpanded && (
+              <tr key={`${t.ep}-detail`} style={{ borderBottom: `1px solid ${c.border}` }}>
+                <td colSpan={9} style={{ padding: 0 }}>
+                  <div style={{ padding: 20, background: c.cardAlt, borderTop: `1px solid ${c.border}` }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: c.text, marginBottom: 14 }}>{t.ep} AB 分析</div>
+                    <div style={{ display: "flex", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+                      <div style={{ flex: "1 1 200px", padding: 12, background: t.winner === "A" ? c.green + "12" : c.card, borderRadius: 8, border: `1px solid ${t.winner === "A" ? c.green + "40" : c.border}` }}>
+                        <div style={{ fontSize: 10, color: c.textDim, marginBottom: 4 }}>版本 A・{t.frameA}</div>
+                        <div style={{ fontSize: 12, color: c.text, marginBottom: 8, lineHeight: 1.5 }}>{t.copyA}</div>
+                        {t.angleA && <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 8 }}>角度：{t.angleA}</div>}
+                        <div style={{ fontSize: 18, fontWeight: 700, color: t.winner === "A" ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{t.ctrA}%</div>
+                      </div>
+                      <div style={{ flex: "1 1 200px", padding: 12, background: t.winner === "B" ? c.green + "12" : c.card, borderRadius: 8, border: `1px solid ${t.winner === "B" ? c.green + "40" : c.border}` }}>
+                        <div style={{ fontSize: 10, color: c.textDim, marginBottom: 4 }}>版本 B・{t.frameB}</div>
+                        <div style={{ fontSize: 12, color: c.text, marginBottom: 8, lineHeight: 1.5 }}>{t.copyB}</div>
+                        {t.angleB && <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 8 }}>角度：{t.angleB}</div>}
+                        <div style={{ fontSize: 18, fontWeight: 700, color: t.winner === "B" ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{t.ctrB}%</div>
+                      </div>
+                    </div>
+                    {t.conclusion && <div style={{ fontSize: 12, color: c.accent, lineHeight: 1.6, marginBottom: 8, padding: "8px 12px", background: c.accent + "10", borderRadius: 6, borderLeft: `3px solid ${c.accent}` }}>結論：{t.conclusion}</div>}
+                    {t.suggestion && <div style={{ fontSize: 11, color: c.textMuted, lineHeight: 1.6, padding: "8px 12px", background: c.card, borderRadius: 6, border: `1px solid ${c.border}` }}>未來建議：{t.suggestion}</div>}
+                  </div>
+                </td>
+              </tr>
+            ),
+          ];
         }}
       />
     </Section>
@@ -697,7 +761,7 @@ function ActionTab({ C: c }) {
 export default function App() {
   const [tab, setTab] = useState(0);
   const [show, setShow] = useState("全部");
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
   const [rawData, setRawData] = useState(null);
   const c = isDark ? themes.dark : themes.light;
 
@@ -712,11 +776,12 @@ export default function App() {
       );
   }, []);
 
-  const { fullVideos, abTests, abSuggestions } = useMemo(() => {
-    if (!rawData) return { fullVideos: [], abTests: [], abSuggestions: [] };
-    const all = processVideos(rawData.videos || []);
+  const { fullVideos, abTests, abSuggestions, formulaConfig } = useMemo(() => {
+    if (!rawData) return { fullVideos: [], abTests: [], abSuggestions: [], formulaConfig: {} };
+    const cfg = rawData.formulaConfig || {};
+    const all = processVideos(rawData.videos || [], cfg);
     const full = all.filter(v => v.type === "完整集");
-    return { fullVideos: full, abTests: rawData.abTests || [], abSuggestions: rawData.abSuggestions || [] };
+    return { fullVideos: full, abTests: rawData.abTests || [], abSuggestions: rawData.abSuggestions || [], formulaConfig: cfg };
   }, [rawData]);
 
   if (!rawData) {
@@ -761,7 +826,7 @@ export default function App() {
       </div>
       <div style={{ padding: "20px 28px 60px", maxWidth: 1100, margin: "0 auto", transition: "all 0.3s" }}>
         {tab === 0 && <OverviewTab fullVideos={fullVideos} C={c} />}
-        {tab === 1 && <CommercialTab fullVideos={fullVideos} C={c} />}
+        {tab === 1 && <CommercialTab fullVideos={fullVideos} formulaConfig={formulaConfig} C={c} />}
         {tab === 2 && <TopicTab fullVideos={fullVideos} C={c} />}
         {tab === 3 && <ABTab abTests={abTests} abSuggestions={abSuggestions} C={c} />}
         {tab === 4 && <TATab fullVideos={fullVideos} selectedShow={show} C={c} />}
