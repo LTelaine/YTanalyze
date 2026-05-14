@@ -837,7 +837,7 @@ export default function App() {
   return (
     <div style={{ background: c.bg, minHeight: "100vh", color: c.text, fontFamily: "'Noto Sans TC', sans-serif", transition: "background 0.3s, color 0.3s", zoom: zoomMap[fontSize] }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <div style={{ borderBottom: `1px solid ${c.border}` }}>
+      <div style={{ borderBottom: `1px solid ${c.border}`, position: "sticky", top: 0, zIndex: 100, background: c.bg, transition: "background 0.3s" }}>
       <div style={{ maxWidth: isFullWidth ? "none" : 1100, margin: isFullWidth ? 0 : "0 auto", padding: "24px 28px 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
           <div>
