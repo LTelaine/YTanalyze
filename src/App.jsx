@@ -642,7 +642,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
 
     {suggBlocks.length > 0 && (
       <Section title="未來 AB Test 建議" sub="根據歷史數據推導的下一步方向">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
           {suggBlocks.map(b => (
             <Card key={b.title} C={c} style={{ borderTop: `3px solid ${b.color}` }}>
               <div style={{ color: b.color, fontSize: 14, fontWeight: 600, marginBottom: 14 }}>{b.title}</div>
