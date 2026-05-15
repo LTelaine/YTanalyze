@@ -162,7 +162,12 @@ async function loadFromSheets() {
     }
   } catch (e) {}
 
-  return { videos, abTests, abSuggestions, formulaConfig };
+  const recordTime = videos.length > 0 ? (videos[0].date ? videos.reduce((latest, v) => {
+    const rt = dataRows.find(r => r[col("影片 ID")] === v.id)?.[col("紀錄時間")] || "";
+    return rt > latest ? rt : latest;
+  }, "") : "") : "";
+
+  return { videos, abTests, abSuggestions, formulaConfig, recordTime };
 }
 
 function processVideos(rawVideos, cfg = {}) {
@@ -185,9 +190,9 @@ function processVideos(rawVideos, cfg = {}) {
 function fmt(n) { return n >= 10000 ? (n/10000).toFixed(1) + "萬" : n >= 1000 ? (n/1000).toFixed(1) + "K" : String(n); }
 
 // ── Sortable Table ──
-function SortableTable({ headers, dataKeys, data, renderRow, C }) {
-  const [sortKey, setSortKey] = useState(null);
-  const [sortDir, setSortDir] = useState("desc");
+function SortableTable({ headers, dataKeys, data, renderRow, C, defaultSortKey, defaultSortDir = "desc", maxHeight }) {
+  const [sortKey, setSortKey] = useState(defaultSortKey || null);
+  const [sortDir, setSortDir] = useState(defaultSortDir);
 
   const handleSort = (key) => {
     if (sortKey === key) { setSortDir(d => d === "asc" ? "desc" : "asc"); }
@@ -205,9 +210,9 @@ function SortableTable({ headers, dataKeys, data, renderRow, C }) {
   }, [data, sortKey, sortDir]);
 
   return (
-    <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "auto" }}>
+    <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "auto", maxHeight: maxHeight || "none" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-        <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>
+        <thead><tr style={{ borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 2 }}>
           {headers.map((h, i) => {
             const key = dataKeys[i];
             const active = sortKey === key;
@@ -217,7 +222,7 @@ function SortableTable({ headers, dataKeys, data, renderRow, C }) {
                 textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap",
                 cursor: key ? "pointer" : "default", userSelect: "none", transition: "background 0.15s",
                 color: active ? C.accent : C.textMuted,
-                background: active ? C.sortHover : "transparent",
+                background: active ? C.sortHover : C.card,
               }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                   {h}
@@ -262,6 +267,25 @@ function Card({ children, style: s, C: c }) {
 }
 
 const TT = (c) => ({ background: c.card, border: `1px solid ${c.border}`, borderRadius: 8, color: c.text, fontSize: 12 });
+
+function VideoTitleCell({ v, C: c }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <td style={{ padding: "10px 14px", position: "relative" }}>
+      <a href={`https://www.youtube.com/watch?v=${v.id}`} target="_blank" rel="noopener noreferrer"
+        onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+        style={{ color: c.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", textDecoration: hover ? "underline" : "none", cursor: "pointer" }}>
+        {v.title}
+      </a>
+      {hover && (
+        <div style={{ position: "absolute", bottom: "100%", left: 0, zIndex: 20, background: c.card, border: `1px solid ${c.border}`, borderRadius: 8, padding: 6, boxShadow: "0 4px 12px rgba(0,0,0,0.3)", pointerEvents: "none" }}>
+          <img src={`https://img.youtube.com/vi/${v.id}/mqdefault.jpg`} alt="" style={{ width: 220, borderRadius: 4, display: "block" }} />
+          <div style={{ fontSize: 11, color: c.textMuted, marginTop: 4, maxWidth: 220, whiteSpace: "normal" }}>{v.title}</div>
+        </div>
+      )}
+    </td>
+  );
+}
 
 // ── Theme Toggle Switch ──
 function ThemeSwitch({ isDark, toggle, C: c }) {
@@ -438,16 +462,16 @@ function OverviewTab({ fullVideos, C: c }) {
     <Section title="觀看數 Top 10" sub="點擊欄位標題可排序 ・ 滑鼠移到標題可看完整文字">
       <SortableTable C={c} headers={["#", "節目", "集數", "標題", "流量來源", "觀看", "訂閱", "互動率", "商機"]}
         dataKeys={[null, "show", "ep", "title", "traffic", "views", "subs", "interactRate", "commercialIdx"]}
-        data={fullVideos}
+        data={fullVideos} defaultSortKey="views" maxHeight={520}
         renderRow={(v, i) => (
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
             <td style={{ padding: "10px 14px", color: c.textDim }}>{i + 1}</td>
             <td style={{ padding: "10px 14px" }}><Tag text={v.show} color={c.colors6[SHOWS.indexOf(v.show) % 6]} C={c} /></td>
             <td title={v.date} style={{ padding: "10px 14px", color: c.textMuted, cursor: "help" }}>{v.ep}</td>
-            <td title={v.title} style={{ padding: "10px 14px", color: c.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "default" }}>{v.title}</td>
+            <VideoTitleCell v={v} C={c} />
             <td style={{ padding: "10px 14px", color: c.textMuted, fontSize: 11, whiteSpace: "nowrap" }}>{v.traffic}</td>
             <td style={{ padding: "10px 14px", color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(v.views)}</td>
-            <td style={{ padding: "10px 14px", color: c.green, fontFamily: "'JetBrains Mono', monospace" }}>+{v.subs}</td>
+            <td style={{ padding: "10px 14px", color: v.subs > 0 ? c.green : v.subs < 0 ? c.red : c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{v.subs > 0 ? `+${v.subs}` : v.subs}</td>
             <td style={{ padding: "10px 14px", color: c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{v.interactRate}%</td>
             <td style={{ padding: "10px 14px", color: c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{v.commercialIdx}</td>
           </tr>
@@ -494,7 +518,11 @@ function CommercialTab({ fullVideos, formulaConfig: cfg = {}, C: c }) {
             <CartesianGrid strokeDasharray="3 3" stroke={c.border} horizontal={false} />
             <XAxis type="number" stroke={c.textDim} fontSize={11} domain={[0, 10]} />
             <YAxis type="category" dataKey="ep" stroke={c.textDim} fontSize={11} width={55} />
-            <Tooltip contentStyle={TT(c)} formatter={v => v.toFixed(2)} />
+            <Tooltip contentStyle={TT(c)} content={({ active, payload }) => {
+              if (!active || !payload?.[0]) return null;
+              const d = payload[0].payload;
+              return <div style={{ ...TT(c), padding: "8px 12px" }}><div style={{ fontWeight: 600, marginBottom: 2 }}>{d.ep} {d.show}</div><div>商機：{d.commercialIdx.toFixed(2)}</div></div>;
+            }} />
             <Bar dataKey="commercialIdx" name="商機" radius={[0, 5, 5, 0]}>
               {sorted.slice(0, 10).map((v, i) => <Cell key={i} fill={v.commercialIdx >= 6 ? c.green : v.commercialIdx >= 4 ? c.accent : c.red} />)}
             </Bar>
@@ -514,7 +542,7 @@ function CommercialTab({ fullVideos, formulaConfig: cfg = {}, C: c }) {
             <PolarGrid stroke={c.border} />
             <PolarAngleAxis dataKey="dim" stroke={c.textMuted} fontSize={11} />
             <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-            {sorted.slice(0, 5).map((v, i) => <Radar key={v.ep} name={v.ep} dataKey={v.ep} stroke={c.colors6[i]} fill={c.colors6[i]} fillOpacity={0.1} strokeWidth={1.5} />)}
+            {sorted.slice(0, 5).map((v, i) => <Radar key={v.ep} name={`${v.ep} ${v.show}`} dataKey={v.ep} stroke={c.colors6[i]} fill={c.colors6[i]} fillOpacity={0.1} strokeWidth={1.5} />)}
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <Tooltip contentStyle={TT(c)} />
           </RadarChart>
@@ -708,9 +736,10 @@ function ABTab({ abTests, abSuggestions, C: c }) {
   const frameStats = useMemo(() => {
     const map = {};
     abTests.forEach(t => {
-      [{ frame: t.frameA, ctr: t.ctrA, won: t.winner === "A" }, { frame: t.frameB, ctr: t.ctrB, won: t.winner === "B" }].forEach(({ frame, ctr, won }) => {
-        if (!map[frame]) map[frame] = { frame, totalCTR: 0, count: 0, wins: 0 };
+      [{ frame: t.frameA, ctr: t.ctrA, won: t.winner === "A", ep: t.ep, show: t.show }, { frame: t.frameB, ctr: t.ctrB, won: t.winner === "B", ep: t.ep, show: t.show }].forEach(({ frame, ctr, won, ep, show }) => {
+        if (!map[frame]) map[frame] = { frame, totalCTR: 0, count: 0, wins: 0, eps: [] };
         map[frame].totalCTR += ctr; map[frame].count++; if (won) map[frame].wins++;
+        map[frame].eps.push(`${show} ${ep}`);
       });
     });
     return Object.values(map).map(f => ({ ...f, avgCTR: +(f.totalCTR / f.count).toFixed(1), winRate: Math.round(f.wins / f.count * 100) })).sort((a, b) => b.winRate - a.winRate);
@@ -767,10 +796,10 @@ function ABTab({ abTests, abSuggestions, C: c }) {
       </Card>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
         {frameStats.map(f => (
-          <Card key={f.frame} C={c} style={{ flex: "1 1 120px", minWidth: 120, padding: 14 }}>
-            <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 4 }}>{f.frame}</div>
+          <Card key={f.frame} C={c} style={{ flex: "1 1 120px", minWidth: 120, padding: 14, cursor: "default" }}>
+            <div title={f.eps.join("\n")} style={{ fontSize: 11, color: c.textMuted, marginBottom: 4 }}>{f.frame}</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: frameColorMap[f.frame] || c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{f.winRate}%</div>
-            <div style={{ fontSize: 10, color: c.textDim, marginTop: 2 }}>平均 CTR {f.avgCTR}% ・ {f.count} 次</div>
+            <div title={f.eps.join("、")} style={{ fontSize: 10, color: c.textDim, marginTop: 2, cursor: "help" }}>平均 CTR {f.avgCTR}% ・ {f.count} 次</div>
           </Card>
         ))}
       </div>
@@ -789,7 +818,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
             <tr key={t.ep} style={{ borderBottom: isExpanded ? "none" : `1px solid ${c.border}`, background: isExpanded ? c.sortHover : "transparent", transition: "background 0.15s" }}>
               <td title={t.date} style={{ padding: "12px 14px", color: c.text, fontWeight: 500, cursor: "help" }}>{t.ep}</td>
               <td style={{ padding: "12px 14px" }}><Tag text={t.show} color={c.colors6[SHOWS.indexOf(t.show) % 6]} C={c} /></td>
-              <td style={{ padding: "12px 14px" }}><Tag text={t.testVar} color={t.testVar === "情緒框架" ? c.purple : t.testVar === "議題包裝" ? c.teal : c.coral} C={c} /></td>
+              <td title={`A: ${t.topicAngleA || t.angleA || t.frameA}\nB: ${t.topicAngleB || t.angleB || t.frameB}`} style={{ padding: "12px 14px", cursor: "help" }}><Tag text={t.testVar} color={t.testVar === "情緒框架" ? c.purple : t.testVar === "議題包裝" ? c.teal : c.coral} C={c} /></td>
               <td title={t.copyA} style={{ padding: "12px 14px", color: t.winner === "A" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "default" }}>{t.copyA}</td>
               <td title={t.copyB} style={{ padding: "12px 14px", color: t.winner === "B" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "default" }}>{t.copyB}</td>
               <td style={{ padding: "12px 14px", minWidth: 160 }}>
@@ -1497,6 +1526,7 @@ export default function App() {
   const [isFullWidth, setIsFullWidth] = useState(false);
   const zoomMap = { small: 0.88, medium: 1, large: 1.12 };
   const [rawData, setRawData] = useState(null);
+  const [dateRange, setDateRange] = useState("all");
   const c = isDark ? themes.dark : themes.light;
 
   useEffect(() => {
@@ -1510,13 +1540,23 @@ export default function App() {
       );
   }, []);
 
-  const { fullVideos, abTests, abSuggestions, formulaConfig } = useMemo(() => {
-    if (!rawData) return { fullVideos: [], abTests: [], abSuggestions: [], formulaConfig: {} };
+  const { fullVideos, abTests, abSuggestions, formulaConfig, recordTime } = useMemo(() => {
+    if (!rawData) return { fullVideos: [], abTests: [], abSuggestions: [], formulaConfig: {}, recordTime: "" };
     const cfg = rawData.formulaConfig || {};
     const all = processVideos(rawData.videos || [], cfg);
     const full = all.filter(v => v.type === "完整集");
-    return { fullVideos: full, abTests: rawData.abTests || [], abSuggestions: rawData.abSuggestions || [], formulaConfig: cfg };
+    return { fullVideos: full, abTests: rawData.abTests || [], abSuggestions: rawData.abSuggestions || [], formulaConfig: cfg, recordTime: rawData.recordTime || "" };
   }, [rawData]);
+
+  const filteredVideos = useMemo(() => {
+    if (dateRange === "all") return fullVideos;
+    const days = dateRange === "30d" ? 30 : 90;
+    const cutoff = new Date(Date.now() - days * 86400000);
+    return fullVideos.filter(v => {
+      if (!v.date) return false;
+      return new Date(v.date.replace(/\//g, "-")) >= cutoff;
+    });
+  }, [fullVideos, dateRange]);
 
   if (!rawData) {
     return (
@@ -1537,12 +1577,17 @@ export default function App() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, transition: "color 0.3s" }}><span style={{ color: c.accent }}>醍醐WAY</span> 內容分析</h1>
-            <p style={{ margin: "3px 0 0", color: c.textMuted, fontSize: 12 }}>共 {fullVideos.length} 支影片 · 點擊欄位標題可排序</p>
+            <p style={{ margin: "3px 0 0", color: c.textMuted, fontSize: 12 }}>共 {filteredVideos.length} 支影片{dateRange !== "all" ? ` (篩選自 ${fullVideos.length} 支)` : ""} · 點擊欄位標題可排序{recordTime ? ` · 資料更新：${recordTime}` : ""}</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {tab === 4 && <select value={show} onChange={e => setShow(e.target.value)} style={{ background: c.card, color: c.text, border: `1px solid ${c.border}`, borderRadius: 6, padding: "6px 12px", fontSize: 12, transition: "all 0.3s" }}>
               {SHOWS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>}
+            <select value={dateRange} onChange={e => setDateRange(e.target.value)} style={{ background: c.card, color: c.text, border: `1px solid ${c.border}`, borderRadius: 6, padding: "6px 12px", fontSize: 12, transition: "all 0.3s" }}>
+              <option value="all">全部時間</option>
+              <option value="30d">近 30 天</option>
+              <option value="90d">近 3 個月</option>
+            </select>
             <FontSizeControl value={fontSize} onChange={setFontSize} C={c} />
             <WidthSwitch isFullWidth={isFullWidth} toggle={() => setIsFullWidth(!isFullWidth)} C={c} />
             <ThemeSwitch isDark={isDark} toggle={() => setIsDark(!isDark)} C={c} />
@@ -1561,14 +1606,14 @@ export default function App() {
       </div>
       </div>
       <div style={{ padding: "20px 28px 60px", maxWidth: isFullWidth ? "none" : 1100, margin: isFullWidth ? 0 : "0 auto", transition: "all 0.3s" }}>
-        {tab === 0 && <OverviewTab fullVideos={fullVideos} C={c} />}
-        {tab === 1 && <CommercialTab fullVideos={fullVideos} formulaConfig={formulaConfig} C={c} />}
-        {tab === 2 && <TopicTab fullVideos={fullVideos} C={c} />}
+        {tab === 0 && <OverviewTab fullVideos={filteredVideos} C={c} />}
+        {tab === 1 && <CommercialTab fullVideos={filteredVideos} formulaConfig={formulaConfig} C={c} />}
+        {tab === 2 && <TopicTab fullVideos={filteredVideos} C={c} />}
         {tab === 3 && <ABTab abTests={abTests} abSuggestions={abSuggestions} C={c} />}
-        {tab === 4 && <TATab fullVideos={fullVideos} selectedShow={show} C={c} />}
-        {tab === 5 && <GuestTab fullVideos={fullVideos} C={c} />}
-        {tab === 6 && <RevenueTab fullVideos={fullVideos} C={c} />}
-        {tab === 7 && <TATopicTab fullVideos={fullVideos} C={c} />}
+        {tab === 4 && <TATab fullVideos={filteredVideos} selectedShow={show} C={c} />}
+        {tab === 5 && <GuestTab fullVideos={filteredVideos} C={c} />}
+        {tab === 6 && <RevenueTab fullVideos={filteredVideos} C={c} />}
+        {tab === 7 && <TATopicTab fullVideos={filteredVideos} C={c} />}
         {tab === 8 && <ActionTab C={c} />}
       </div>
     </div>
