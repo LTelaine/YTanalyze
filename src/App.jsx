@@ -1092,6 +1092,90 @@ function CompetitorChannels({ C: c }) {
   );
 }
 
+// ── Activity Heatmap ──
+const ACTIVITY_DATA = {
+  hours: ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23"],
+  days: ["週日","週一","週二","週三","週四","週五","週六"],
+  data: [
+    [3,2,1,1,0,0,1,2,4,5,5,6,7,7,6,6,6,7,8,9,9,8,6,4],
+    [3,2,1,1,0,0,1,3,5,6,6,6,6,6,6,6,7,8,9,10,10,9,7,5],
+    [3,2,1,1,0,0,1,3,5,6,6,6,6,6,6,6,7,8,9,10,10,9,7,5],
+    [3,2,1,1,0,0,1,3,5,6,6,6,6,6,6,6,7,8,9,10,10,9,7,5],
+    [3,2,1,1,0,0,1,3,5,6,6,6,6,6,6,6,7,8,9,10,10,9,7,5],
+    [3,2,1,1,0,0,1,3,5,6,6,7,7,7,6,6,7,8,9,10,9,8,7,5],
+    [4,3,2,1,1,0,1,2,4,5,6,7,8,7,7,7,7,8,9,9,9,8,7,5],
+  ],
+};
+
+function ActivityHeatmap({ C: c }) {
+  const [tip, setTip] = useState(null);
+  const isDark = c.bg === "#08080A";
+  const purple = isDark ? [139, 92, 246] : [124, 58, 237];
+
+  const cellColor = (val) => {
+    const t = val / 10;
+    if (isDark) {
+      const a = Math.max(t * 0.9 + 0.1, 0.08);
+      return `rgba(${purple[0]},${purple[1]},${purple[2]},${a.toFixed(2)})`;
+    }
+    const r = Math.round(245 - t * (245 - purple[0]));
+    const g = Math.round(243 - t * (243 - purple[1]));
+    const b = Math.round(238 - t * (238 - purple[2]));
+    return `rgb(${r},${g},${b})`;
+  };
+
+  return (
+    <Section title="觀眾活躍時段" sub="最近 28 天 ・ GMT+0800">
+      <Card C={c}>
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "inline-grid", gridTemplateColumns: `40px repeat(24, 20px)`, gridTemplateRows: `repeat(7, 20px) 20px`, gap: 3, alignItems: "center" }}>
+            {ACTIVITY_DATA.days.map((day, di) => (
+              [
+                <div key={`l-${di}`} style={{ fontSize: 10, color: c.textMuted, textAlign: "right", paddingRight: 6, whiteSpace: "nowrap" }}>{day}</div>,
+                ...ACTIVITY_DATA.hours.map((hr, hi) => {
+                  const val = ACTIVITY_DATA.data[di][hi];
+                  return (
+                    <div key={`${di}-${hi}`}
+                      onMouseEnter={(e) => setTip({ day, hr, val, x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setTip(null)}
+                      style={{ width: 20, height: 20, borderRadius: 3, background: cellColor(val), cursor: "default", transition: "transform 0.1s" }}
+                      onMouseOver={e => e.currentTarget.style.transform = "scale(1.3)"}
+                      onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                    />
+                  );
+                }),
+              ]
+            ))}
+            {/* X-axis labels row */}
+            <div />
+            {ACTIVITY_DATA.hours.map((hr, i) => (
+              <div key={`x-${i}`} style={{ fontSize: 9, color: c.textDim, textAlign: "center" }}>{i % 3 === 0 ? hr : ""}</div>
+            ))}
+          </div>
+        </div>
+
+        {tip && (
+          <div style={{ position: "fixed", left: tip.x + 10, top: tip.y - 40, zIndex: 9999, background: c.card, border: `1px solid ${c.border}`, borderRadius: 6, padding: "6px 10px", fontSize: 11, color: c.text, boxShadow: "0 4px 12px rgba(0,0,0,0.3)", pointerEvents: "none", whiteSpace: "nowrap" }}>
+            {tip.day} {tip.hr}:00　活躍度 <strong style={{ color: c.purple }}>{tip.val}</strong>/10
+          </div>
+        )}
+
+        <div style={{ marginTop: 14, padding: "8px 12px", background: c.purple + "12", borderRadius: 6, borderLeft: `3px solid ${c.purple}`, fontSize: 12, color: c.textMuted, lineHeight: 1.6 }}>
+          <span style={{ color: c.purple, fontWeight: 600 }}>最佳上架時段：</span>平日 17:00-18:00，讓影片在觀眾最活躍的 19:00-22:00 累積初始曝光
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4, marginTop: 10, fontSize: 10, color: c.textDim }}>
+          <span>低</span>
+          {[0, 2.5, 5, 7.5, 10].map(v => (
+            <div key={v} style={{ width: 14, height: 14, borderRadius: 2, background: cellColor(v) }} />
+          ))}
+          <span>高</span>
+        </div>
+      </Card>
+    </Section>
+  );
+}
+
 // ── Tab: TA ──
 function TATab({ fullVideos, selectedShow, C: c }) {
   const sv = selectedShow === "全部" ? fullVideos : fullVideos.filter(v => v.show === selectedShow);
@@ -1128,6 +1212,7 @@ function TATab({ fullVideos, selectedShow, C: c }) {
     </Section>
     <SubscriberAnalysis videos={sv} C={c} />
     <SearchTermsChart videos={sv} C={c} />
+    <ActivityHeatmap C={c} />
     <CompetitorChannels C={c} />
   </div>);
 }
