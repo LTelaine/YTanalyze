@@ -1884,6 +1884,7 @@ function ActionTab({ fullVideos, abTests, abSuggestions, C: c }) {
 function SlideModal({ C: c, onClose, totalPages, defaultPreset, presets, children: renderSlides }) {
   const [page, setPage] = useState(0);
   const [fade, setFade] = useState(true);
+  const [slideZoom, setSlideZoom] = useState(1);
   const mono = "'JetBrains Mono', monospace";
   const now = new Date();
   const fmtD = d => d.toISOString().slice(0, 10);
@@ -1917,10 +1918,21 @@ function SlideModal({ C: c, onClose, totalPages, defaultPreset, presets, childre
             <span style={{ color: c.textDim }}>→</span>
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
             {allPresets.map(([label, key]) => <button key={key} onClick={() => setPreset(key)} style={btnS(false)}>{label}</button>)}
+            <div style={{ display: "flex", alignItems: "center", border: `1px solid ${c.border}`, borderRadius: 6, overflow: "hidden", marginLeft: 4 }}>
+              {[["A", 0.82], ["A", 1], ["A", 1.2]].map(([label, z], i) => (
+                <button key={z} onClick={() => setSlideZoom(z)} style={{
+                  background: slideZoom === z ? c.accent + "20" : "none", border: "none",
+                  borderRight: i < 2 ? `1px solid ${c.border}` : "none",
+                  color: slideZoom === z ? c.accent : c.textMuted,
+                  padding: "4px 7px", cursor: "pointer", fontWeight: 700, fontFamily: "serif",
+                  fontSize: [11, 14, 17][i], lineHeight: 1,
+                }}>{label}</button>
+              ))}
+            </div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: c.textMuted, fontSize: 22, cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}>✕</button>
         </div>
-        <div style={{ flex: 1, overflow: "auto", padding: "32px 40px", transition: "opacity 0.15s", opacity: fade ? 1 : 0 }}>
+        <div style={{ flex: 1, overflow: "auto", padding: "32px 40px", transition: "opacity 0.15s", opacity: fade ? 1 : 0, zoom: slideZoom }}>
           {renderSlides({ startDate, endDate, page })}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 24px", borderTop: `1px solid ${c.border}`, flexShrink: 0 }}>
