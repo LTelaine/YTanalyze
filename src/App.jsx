@@ -25,7 +25,7 @@ const themes = {
 
 // ── Data ──
 const SHEET_ID = "10Eh6MhCHdcDFi-d1WHbYJS_sbsSUkxNctDNcc3kum9Y";
-const TABS = ["總覽", "商機指標", "12類選題", "A/B 文案", "TA 輪廓", "來賓效應", "收益", "行動建議"];
+const TABS = ["總覽", "商機指標", "12類選題", "A/B 文案", "TA 輪廓", "來賓效應", "收益", "TA 議題", "行動建議"];
 const SHOWS = ["全部", "授ㄉㄟ私捏", "防詐特攻隊", "醫起好健康"];
 
 function parseCSV(text) {
@@ -104,6 +104,8 @@ async function loadFromSheets() {
       unsubscribedViews: +r[col("非訂閱者觀看次數")] || 0,
       unsubscribedMinutes: +r[col("非訂閱者觀看分鐘")] || 0,
       searchTerms: r[col("搜尋關鍵字 Top10")] || "",
+      impressions: +r[col("曝光次數")] || 0,
+      ctrPct: +r[col("CTR 點閱率 %")] || 0,
     });
 
     const copyA = r[col("縮圖文案 A")], copyB = r[col("縮圖文案 B")];
@@ -1146,6 +1148,284 @@ function RevenueTab({ fullVideos, C: c }) {
   </div>);
 }
 
+// ── Show color helper ──
+const SHOW_COLORS = (c) => ({ "授ㄉㄟ私捏": c.green, "防詐特攻隊": c.coral, "醫起好健康": c.blue });
+const SHOW_SHORT = { "授ㄉㄟ私捏": "授", "防詐特攻隊": "詐", "醫起好健康": "醫" };
+function fmtDateShort(dateStr) {
+  if (!dateStr) return "";
+  const m = dateStr.match(/(\d+)\/(\d+)\/(\d+)/);
+  return m ? `${+m[2]}/${+m[3]}` : dateStr.substring(5, 10);
+}
+
+// ── Tab: TA Topic Analysis ──
+function TATopicTab({ fullVideos, C: c }) {
+  const sc = SHOW_COLORS(c);
+  const showNames = ["授ㄉㄟ私捏", "防詐特攻隊", "醫起好健康"];
+  const mono = "'JetBrains Mono', monospace";
+
+  // ─── 1. Data Highlights KPI ───
+  const highlights = useMemo(() => {
+    if (!fullVideos.length) return [];
+    const topViews = [...fullVideos].sort((a, b) => b.views - a.views)[0];
+    const topImpressions = [...fullVideos].filter(v => v.impressions > 0).sort((a, b) => b.impressions - a.impressions)[0];
+    const topWatch = [...fullVideos].sort((a, b) => b.watchSec - a.watchSec)[0];
+    const items = [
+      { label: "最高觀看", value: fmt(topViews.views), sub: topViews.ep || topViews.title.substring(0, 15), color: c.accent },
+    ];
+    if (topImpressions) items.push({ label: "最高曝光", value: fmt(topImpressions.impressions), sub: topImpressions.ep || topImpressions.title.substring(0, 15), color: c.blue });
+    items.push({ label: "最長均長", value: topWatch.avgWatch, sub: topWatch.ep || topWatch.title.substring(0, 15), color: c.green });
+    showNames.forEach(s => {
+      const sv = fullVideos.filter(v => v.show === s);
+      if (!sv.length) return;
+      const latest = sv.sort((a, b) => b.date.localeCompare(a.date))[0];
+      items.push({ label: `${SHOW_SHORT[s]}最新`, value: fmt(latest.views), sub: latest.ep || fmtDateShort(latest.date), color: sc[s] });
+    });
+    return items;
+  }, [fullVideos]);
+
+  // ─── 2. Chart data (sorted by date) ───
+  const chartData = useMemo(() =>
+    [...fullVideos].sort((a, b) => a.date.localeCompare(b.date)).map(v => ({
+      ...v,
+      label: `${SHOW_SHORT[v.show] || "?"}${fmtDateShort(v.date)}`,
+      fill: sc[v.show] || c.textDim,
+    }))
+  , [fullVideos]);
+  const hasImpressions = fullVideos.some(v => v.impressions > 0);
+
+  // ─── 3. Retention data ───
+  const retentionData = useMemo(() =>
+    [...fullVideos].sort((a, b) => b.watchSec - a.watchSec).slice(0, 15).map(v => ({
+      label: `${SHOW_SHORT[v.show] || ""}${v.ep || fmtDateShort(v.date)}`,
+      watchSec: v.watchSec,
+      avgWatch: v.avgWatch,
+      fill: sc[v.show] || c.textDim,
+    }))
+  , [fullVideos]);
+
+  // ─── 4. TA Topic Preference per show ───
+  const showTopics = useMemo(() => {
+    return showNames.map(s => {
+      const sv = fullVideos.filter(v => v.show === s);
+      if (!sv.length) return null;
+      const avgViews = sv.reduce((a, v) => a + v.views, 0) / sv.length;
+      const topics = sv.map(v => {
+        const tier = v.views > avgViews * 2 ? "爆" : v.views < avgViews * 0.5 ? "低" : "穩";
+        return { ...v, tier, avgViews };
+      }).sort((a, b) => b.views - a.views);
+
+      const topicMap = {};
+      sv.forEach(v => {
+        const t = v.topic || "未分類";
+        if (!topicMap[t]) topicMap[t] = { views: 0, count: 0 };
+        topicMap[t].views += v.views; topicMap[t].count++;
+      });
+      const sorted = Object.entries(topicMap).sort((a, b) => b[1].views / b[1].count - a[1].views / a[1].count);
+      const best = sorted[0]?.[0] || "";
+      const worst = sorted[sorted.length - 1]?.[0] || "";
+      const bestAvg = sorted[0] ? Math.round(sorted[0][1].views / sorted[0][1].count) : 0;
+      const worstAvg = sorted.length > 1 ? Math.round(sorted[sorted.length - 1][1].views / sorted[sorted.length - 1][1].count) : 0;
+      let insight = "";
+      if (best && worst && best !== worst) {
+        insight = `「${best}」平均觀看 ${fmt(bestAvg)} 為最強選題，「${worst}」僅 ${fmt(worstAvg)}，建議調整包裝或縮減比例。`;
+      } else if (best) {
+        insight = `「${best}」是表現最穩的選題方向，平均 ${fmt(bestAvg)} 觀看。`;
+      }
+      return { show: s, color: sc[s], topics, avgViews, insight, count: sv.length };
+    }).filter(Boolean);
+  }, [fullVideos]);
+
+  // ─── 5. Cross-show insights ───
+  const crossInsights = useMemo(() => {
+    const ins = [];
+    const topicAll = {};
+    fullVideos.forEach(v => {
+      const t = v.topic || "未分類";
+      if (!topicAll[t]) topicAll[t] = { views: 0, count: 0, watchSec: 0 };
+      topicAll[t].views += v.views; topicAll[t].count++; topicAll[t].watchSec += v.watchSec;
+    });
+    const topicArr = Object.entries(topicAll).map(([t, d]) => ({ topic: t, avgViews: Math.round(d.views / d.count), avgWatch: Math.round(d.watchSec / d.count), total: d.views, count: d.count }));
+    const bestTopic = topicArr.sort((a, b) => b.avgViews - a.avgViews)[0];
+    if (bestTopic) ins.push({ num: "01", title: "最強選題類別", text: `「${bestTopic.topic}」跨節目平均觀看 ${fmt(bestTopic.avgViews)}，共 ${bestTopic.count} 集，是受眾最買單的內容方向。` });
+
+    const concrete = fullVideos.filter(v => /理財|法律|詐騙|健康|醫/.test(v.topic));
+    const abstract = fullVideos.filter(v => /心理|自我|命理|職場/.test(v.topic));
+    if (concrete.length && abstract.length) {
+      const cAvg = Math.round(concrete.reduce((a, v) => a + v.views, 0) / concrete.length);
+      const aAvg = Math.round(abstract.reduce((a, v) => a + v.views, 0) / abstract.length);
+      ins.push({ num: "02", title: "具體 vs 抽象議題", text: `具體議題（理財/法律/健康）平均 ${fmt(cAvg)}，抽象議題（心理/命理/職場）平均 ${fmt(aAvg)}。${cAvg > aAvg ? "具體痛點類內容更容易引發點擊。" : "抽象心理類反而更吸引受眾好奇心。"}` });
+    }
+
+    const longestTopic = [...topicArr].sort((a, b) => b.avgWatch - a.avgWatch)[0];
+    if (longestTopic) {
+      const mm = Math.floor(longestTopic.avgWatch / 60);
+      const ss = longestTopic.avgWatch % 60;
+      ins.push({ num: "03", title: "留存最強選題", text: `「${longestTopic.topic}」平均觀看 ${mm}:${String(ss).padStart(2, "0")}，留存率領先，適合做深度長片或系列企劃。` });
+    }
+
+    const showAvg = showNames.map(s => {
+      const sv = fullVideos.filter(v => v.show === s);
+      return sv.length ? { show: s, avg: Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length), count: sv.length } : null;
+    }).filter(Boolean);
+    const weakest = showAvg.sort((a, b) => a.avg - b.avg)[0];
+    if (weakest) ins.push({ num: "04", title: `${weakest.show} 瓶頸分析`, text: `「${weakest.show}」平均觀看 ${fmt(weakest.avg)}（${weakest.count} 集），為三節目中最低。建議強化縮圖文案的好奇懸念框架，並測試不同選題包裝。` });
+
+    return ins;
+  }, [fullVideos]);
+
+  // ─── 6. Weakest show recommendations ───
+  const recommendations = useMemo(() => {
+    const showAvg = showNames.map(s => {
+      const sv = fullVideos.filter(v => v.show === s);
+      return sv.length ? { show: s, avg: Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length) } : null;
+    }).filter(Boolean);
+    const w = showAvg.sort((a, b) => a.avg - b.avg)[0];
+    if (!w) return { show: "", items: [] };
+    return {
+      show: w.show,
+      items: [
+        { tag: "縮圖策略", color: c.red, items: [`${w.show} 目前 CTR 偏低，建議採用「好奇懸念」框架`, "加入具體數字或反差語句提升點擊衝動"] },
+        { tag: "分發策略", color: c.blue, items: ["發布後 2 小時內分享到相關社群與 LINE 群組", "善用 Shorts 為完整集導流"] },
+        { tag: "選題策略", color: c.green, items: ["優先挑選已驗證的高觀看選題類別", "嘗試與其他節目的熱門選題交叉"] },
+        { tag: "測試流程", color: c.purple, items: ["每集都做 A/B 縮圖測試，累積數據", "測試 48 小時後切換為勝出版本"] },
+      ],
+    };
+  }, [fullVideos]);
+
+  const tierColor = { "爆": c.red, "穩": c.coral, "低": c.textDim };
+  const tierBg = { "爆": c.red + "18", "穩": c.coral + "18", "低": c.textDim + "15" };
+
+  return (<div>
+    {/* 1. KPI Highlights */}
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      {highlights.map((h, i) => <KPI key={i} label={h.label} value={h.value} sub={h.sub} color={h.color} C={c} />)}
+    </div>
+
+    {/* 2. Views & Impressions dual chart */}
+    <Section title="觀看次數（按上架日期）" sub="各集觀看數，依節目顏色區分">
+      <Card C={c}>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke={c.border} />
+            <XAxis dataKey="label" stroke={c.textDim} fontSize={9} angle={-35} textAnchor="end" height={55} interval={0} />
+            <YAxis stroke={c.textDim} fontSize={11} />
+            <Tooltip contentStyle={TT(c)} labelFormatter={(_, payload) => payload[0]?.payload?.title || ""} formatter={v => fmt(v)} />
+            <Bar dataKey="views" name="觀看次數" radius={[3, 3, 0, 0]}>
+              {chartData.map((v, i) => <Cell key={i} fill={v.fill} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
+    </Section>
+    <Section title="曝光次數（按上架日期）" sub={hasImpressions ? "各集縮圖曝光數" : "待 Reach Report 填入"}>
+      <Card C={c}>
+        {hasImpressions ? (
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={c.border} />
+              <XAxis dataKey="label" stroke={c.textDim} fontSize={9} angle={-35} textAnchor="end" height={55} interval={0} />
+              <YAxis stroke={c.textDim} fontSize={11} />
+              <Tooltip contentStyle={TT(c)} labelFormatter={(_, payload) => payload[0]?.payload?.title || ""} formatter={v => fmt(v)} />
+              <Bar dataKey="impressions" name="曝光次數" radius={[3, 3, 0, 0]}>
+                {chartData.map((v, i) => <Cell key={i} fill={v.fill + "99"} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ textAlign: "center", padding: 40, color: c.textDim, fontSize: 13 }}>待 Reach Report 資料填入後顯示</div>
+        )}
+      </Card>
+    </Section>
+
+    {/* 3. Retention analysis */}
+    <Section title="留存分析：平均觀看時長排行" sub="Top 15，標注最長與最短">
+      <Card C={c}>
+        <ResponsiveContainer width="100%" height={Math.max(retentionData.length * 30, 200)}>
+          <BarChart data={retentionData} layout="vertical" margin={{ left: 5, right: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={c.border} horizontal={false} />
+            <XAxis type="number" stroke={c.textDim} fontSize={11} unit="s" />
+            <YAxis type="category" dataKey="label" stroke={c.textDim} fontSize={10} width={65} />
+            <Tooltip contentStyle={TT(c)} formatter={(v, _, p) => [`${p.payload.avgWatch}`, "觀看時長"]} />
+            <Bar dataKey="watchSec" name="觀看秒數" radius={[0, 4, 4, 0]}>
+              {retentionData.map((v, i) => <Cell key={i} fill={i === 0 ? c.green : i === retentionData.length - 1 ? c.red : v.fill} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+        <div style={{ display: "flex", gap: 16, justifyContent: "center", padding: "8px 0 0", fontSize: 11, color: c.textMuted }}>
+          <span><span style={{ color: c.green }}>■</span> 最長</span>
+          <span><span style={{ color: c.red }}>■</span> 最短</span>
+        </div>
+      </Card>
+    </Section>
+
+    {/* 4. TA Topic Preference per show */}
+    <Section title="TA 議題偏好" sub="各節目選題表現：爆＝觀看 > 2x 平均 / 穩＝0.5x-2x / 低＝ < 0.5x">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
+        {showTopics.map(st => (
+          <Card key={st.show} C={c} style={{ borderTop: `4px solid ${st.color}`, padding: 0, overflow: "hidden" }}>
+            <div style={{ padding: "16px 18px 10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <span style={{ color: st.color, fontSize: 15, fontWeight: 700 }}>{st.show}</span>
+                <span style={{ color: c.textDim, fontSize: 11 }}>{st.count} 集 ・ 平均 {fmt(Math.round(st.avgViews))}</span>
+              </div>
+              {st.topics.map((v, i) => (
+                <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: i < st.topics.length - 1 ? `1px solid ${c.border}` : "none" }}>
+                  <span style={{ background: tierBg[v.tier], color: tierColor[v.tier], fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, minWidth: 24, textAlign: "center" }}>{v.tier}</span>
+                  <span style={{ color: c.textMuted, fontSize: 10, minWidth: 38 }}>{fmtDateShort(v.date)}</span>
+                  <span title={v.title} style={{ color: c.text, fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.topic || v.title.substring(0, 20)}</span>
+                  <span style={{ color: c.text, fontSize: 11, fontFamily: mono, minWidth: 45, textAlign: "right" }}>{fmt(v.views)}</span>
+                  <span style={{ color: c.textDim, fontSize: 10, minWidth: 35, textAlign: "right" }}>{v.avgWatch}</span>
+                </div>
+              ))}
+            </div>
+            {st.insight && (
+              <div style={{ padding: "10px 18px", background: st.color + "10", borderTop: `1px solid ${st.color}25`, fontSize: 11, color: c.textMuted, lineHeight: 1.6 }}>
+                <span style={{ color: st.color, fontWeight: 600 }}>洞察：</span>{st.insight}
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
+    </Section>
+
+    {/* 5. Cross-show insights */}
+    {crossInsights.length > 0 && (
+      <Section title="跨節目 TA 偏好規律" sub="從數據中自動提取的洞察">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+          {crossInsights.map(ins => (
+            <Card key={ins.num} C={c} style={{ borderLeft: `3px solid ${c.accent}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <span style={{ background: c.accent + "18", color: c.accent, fontSize: 16, fontWeight: 800, fontFamily: mono, padding: "4px 10px", borderRadius: 6 }}>{ins.num}</span>
+                <span style={{ color: c.text, fontSize: 14, fontWeight: 600 }}>{ins.title}</span>
+              </div>
+              <div style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.7 }}>{ins.text}</div>
+            </Card>
+          ))}
+        </div>
+      </Section>
+    )}
+
+    {/* 6. Recommendations for weakest show */}
+    {recommendations.show && (
+      <Section title={`下一步建議：${recommendations.show}`} sub="針對觀看數平均最低的節目">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+          {recommendations.items.map(r => (
+            <Card key={r.tag} C={c} style={{ borderTop: `3px solid ${r.color}` }}>
+              <div style={{ color: r.color, fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{r.tag}</div>
+              {r.items.map((item, j) => (
+                <div key={j} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                  <span style={{ color: r.color, fontSize: 8, marginTop: 5 }}>●</span>
+                  <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6 }}>{item}</span>
+                </div>
+              ))}
+            </Card>
+          ))}
+        </div>
+      </Section>
+    )}
+  </div>);
+}
+
 // ── Tab: Guests ──
 function GuestTab({ fullVideos, C: c }) {
   const guests = useMemo(() => {
@@ -1288,7 +1568,8 @@ export default function App() {
         {tab === 4 && <TATab fullVideos={fullVideos} selectedShow={show} C={c} />}
         {tab === 5 && <GuestTab fullVideos={fullVideos} C={c} />}
         {tab === 6 && <RevenueTab fullVideos={fullVideos} C={c} />}
-        {tab === 7 && <ActionTab C={c} />}
+        {tab === 7 && <TATopicTab fullVideos={fullVideos} C={c} />}
+        {tab === 8 && <ActionTab C={c} />}
       </div>
     </div>
   );
