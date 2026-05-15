@@ -2046,62 +2046,126 @@ function ReportSlides({ allVideos, allAbTests, startDate, endDate, page, C: c })
       if (!abTests.length) return <div style={{ textAlign: "center", padding: 60, color: c.textDim, fontSize: 18 }}>本期間無 AB test 數據</div>;
       const sorted = [...abTests].sort((a, b) => Math.abs(b.ctrB - b.ctrA) - Math.abs(a.ctrB - a.ctrA));
       const maxCTR = Math.max(...abTests.flatMap(t => [t.ctrA, t.ctrB])) || 1;
+      const avgGap = +(abTests.reduce((a, t) => a + Math.abs(t.ctrB - t.ctrA), 0) / abTests.length).toFixed(1);
+      const biggest = sorted[0];
+      const gapLabel = (g) => g > 20 ? { t: "極顯著", i: "🔥", c: c.red } : g > 10 ? { t: "顯著", i: "⚡", c: c.coral } : g > 5 ? { t: "有差異", i: "📊", c: c.green } : { t: "差異小", i: "～", c: c.textDim };
+      const varColor = { "情緒框架": c.purple, "議題包裝": c.teal, "混合": c.coral };
       return (
         <div>
-          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, textAlign: "center" }}>CTR 差距視覺化</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 20, textAlign: "center" }}>CTR 差距視覺化</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {sorted.map((t, i) => {
               const gap = Math.abs(t.ctrB - t.ctrA);
               const isMax = i === 0;
+              const gl = gapLabel(gap);
+              const showColor = sc[t.show] || c.accent;
               return (
-                <div key={t.ep} style={{ display: "flex", alignItems: "center", gap: 10, padding: isMax ? "10px 12px" : "6px 12px", background: isMax ? c.red + "10" : "transparent", borderRadius: 8, border: isMax ? `1px solid ${c.red}30` : "none" }}>
-                  <span style={{ color: c.text, fontWeight: 600, fontSize: 14, minWidth: 55 }}>{t.ep}</span>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 4 }}>
-                    <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
-                      <div style={{ background: t.winner === "A" ? c.green : c.textDim + "60", height: 22, width: `${t.ctrA / maxCTR * 100}%`, borderRadius: "4px 0 0 4px", minWidth: 30, display: "flex", alignItems: "center", justifyContent: "flex-start", paddingLeft: 6, fontSize: 11, color: "#fff", fontWeight: 600 }}>{t.ctrA}%</div>
+                <div key={t.ep} style={{ padding: "12px 14px", background: isMax ? c.red + "08" : c.cardAlt, borderRadius: 10, border: `1px solid ${isMax ? c.red + "30" : c.border}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ color: c.text, fontWeight: 700, fontSize: 14 }}>{t.ep}</span>
+                    <span style={{ background: showColor + "18", color: showColor, fontSize: 10, padding: "2px 8px", borderRadius: 8, fontWeight: 600 }}>{t.show}</span>
+                    <span style={{ background: (varColor[t.testVar] || c.accent) + "15", color: varColor[t.testVar] || c.accent, fontSize: 10, padding: "2px 8px", borderRadius: 8 }}>{t.testVar}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ flex: 1, textAlign: "right" }}>
+                      <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.copyA?.substring(0, 18)}… <span style={{ color: c.textDim }}>({t.frameA})</span></div>
+                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                        <div style={{ background: t.winner === "A" ? c.green : c.textDim + "50", height: 24, width: `${t.ctrA / maxCTR * 100}%`, borderRadius: "5px 0 0 5px", minWidth: 40, display: "flex", alignItems: "center", justifyContent: "flex-start", paddingLeft: 8, fontSize: 12, color: "#fff", fontWeight: 600, gap: 4 }}>{t.ctrA}%{t.winner === "A" && " ✓"}</div>
+                      </div>
                     </div>
-                    <div style={{ width: 2, height: 22, background: c.border }} />
+                    <div style={{ width: 2, height: 40, background: c.border, flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ background: t.winner === "B" ? c.green : c.textDim + "60", height: 22, width: `${t.ctrB / maxCTR * 100}%`, borderRadius: "0 4px 4px 0", minWidth: 30, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 6, fontSize: 11, color: "#fff", fontWeight: 600 }}>{t.ctrB}%</div>
+                      <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.copyB?.substring(0, 18)}… <span style={{ color: c.textDim }}>({t.frameB})</span></div>
+                      <div style={{ display: "flex" }}>
+                        <div style={{ background: t.winner === "B" ? c.green : c.textDim + "50", height: 24, width: `${t.ctrB / maxCTR * 100}%`, borderRadius: "0 5px 5px 0", minWidth: 40, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 8, fontSize: 12, color: "#fff", fontWeight: 600, gap: 4 }}>{t.winner === "B" && "✓ "}{t.ctrB}%</div>
+                      </div>
+                    </div>
+                    <div style={{ minWidth: 65, textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ color: gl.c, fontFamily: mono, fontWeight: 700, fontSize: 14 }}>+{gap.toFixed(1)}%</div>
+                      <div style={{ color: gl.c, fontSize: 10 }}>{gl.i} {gl.t}</div>
                     </div>
                   </div>
-                  <span style={{ color: isMax ? c.red : c.accent, fontFamily: mono, fontWeight: 700, minWidth: 50, textAlign: "right" }}>+{gap.toFixed(1)}%</span>
                 </div>
               );
             })}
           </div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 16, fontSize: 12, color: c.textMuted }}>
-            <span>← A 版</span><span>B 版 →</span><span style={{ color: c.green }}>■ 勝出</span>
+          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 12, fontSize: 11, color: c.textMuted }}>
+            <span>← A 版</span><span>B 版 →</span><span style={{ color: c.green }}>■ ✓ 勝出</span>
+          </div>
+          <div style={{ marginTop: 14, padding: "12px 16px", background: c.accent + "10", borderRadius: 8, fontSize: 14, color: c.text, textAlign: "center", lineHeight: 1.7 }}>
+            本期 <strong>{abTests.length}</strong> 次 AB test，平均 CTR 差距 <strong style={{ color: c.accent }}>{avgGap}%</strong>。
+            差距最大的是 <strong>{biggest.ep}</strong>（+{Math.abs(biggest.ctrB - biggest.ctrA).toFixed(1)}%），
+            測試變數為「{biggest.testVar}」，勝出框架為「<strong style={{ color: c.green }}>{biggest.winner === "A" ? biggest.frameA : biggest.frameB}</strong>」。
           </div>
         </div>
       );
     },
     // ── Slide 4: Topic Heat ──
     () => {
+      const fullOnly = videos.filter(v => v.type === "完整集" || !v.type);
       const showCards = showNames.map(s => {
-        const sv = videos.filter(v => v.show === s);
-        if (!sv.length) return null;
+        const sv = fullOnly.filter(v => v.show === s);
+        if (!sv.length) return { show: s, color: sc[s] || c.accent, items: [], avg: 0, insight: "" };
         const avg = sv.reduce((a, v) => a + v.views, 0) / sv.length;
-        return { show: s, color: sc[s] || c.accent, items: sv.map(v => ({ ...v, tier: v.views > avg * 2 ? "爆" : v.views < avg * 0.5 ? "低" : "穩" })).sort((a, b) => b.views - a.views) };
-      }).filter(Boolean);
-      const tierStyle = { "爆": { bg: c.red + "18", color: c.red, icon: "🔥" }, "穩": { bg: c.accent + "18", color: c.accent, icon: "" }, "低": { bg: c.textDim + "15", color: c.textDim, icon: "" } };
+        const items = sv.map(v => {
+          const tier = v.views > avg * 2 ? "爆" : v.views < avg * 0.5 ? "低" : "穩";
+          return { ...v, tier };
+        }).sort((a, b) => b.views - a.views);
+        const topicMap = {};
+        sv.forEach(v => { const t = v.topic || "未分類"; if (!topicMap[t]) topicMap[t] = { views: 0, watchSec: 0, count: 0 }; topicMap[t].views += v.views; topicMap[t].watchSec += v.watchSec; topicMap[t].count++; });
+        const topTopic = Object.entries(topicMap).sort((a, b) => b[1].views / b[1].count - a[1].views / a[1].count)[0];
+        let insight = "";
+        if (topTopic && topTopic[0] !== "未分類") {
+          const avgW = Math.floor(topTopic[1].watchSec / topTopic[1].count / 60);
+          const avgS = (topTopic[1].watchSec / topTopic[1].count % 60 | 0).toString().padStart(2, "0");
+          insight = `「${topTopic[0]}」類表現最佳，平均觀看 ${fmt(Math.round(topTopic[1].views / topTopic[1].count))}，均長 ${avgW}:${avgS}`;
+        } else if (items.length) {
+          insight = `最強集 ${items[0].ep || ""} 觀看 ${fmt(items[0].views)}，建議分析成功因素`;
+        }
+        return { show: s, color: sc[s] || c.accent, items, avg: Math.round(avg), insight };
+      });
+      const tierInfo = { "爆": { bg: c.red + "18", color: c.red, icon: "🔥", hint: "> 平均 2 倍" }, "穩": { bg: c.accent + "18", color: c.accent, icon: "", hint: "接近平均水準" }, "低": { bg: c.textDim + "15", color: c.textDim, icon: "", hint: "< 平均 50%" } };
       return (
         <div>
-          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, textAlign: "center" }}>選題熱度</div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 20, textAlign: "center" }}>選題熱度</div>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(showCards.length, 3)}, 1fr)`, gap: 14 }}>
             {showCards.map(s => (
-              <div key={s.show} style={{ background: c.cardAlt, borderRadius: 10, border: `1px solid ${c.border}`, borderTop: `4px solid ${s.color}`, padding: 16 }}>
-                <div style={{ color: s.color, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{s.show}</div>
-                {s.items.slice(0, 6).map(v => {
-                  const ts = tierStyle[v.tier];
-                  return (
-                    <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                      <span style={{ background: ts.bg, color: ts.color, fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 4, minWidth: 28, textAlign: "center" }}>{v.tier}{ts.icon}</span>
-                      <span style={{ color: c.text, fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.ep || v.title.substring(0, 15)}</span>
-                      <span style={{ color: c.textMuted, fontFamily: mono, fontSize: 12 }}>{fmt(v.views)}</span>
-                    </div>
-                  );
-                })}
+              <div key={s.show} style={{ background: c.cardAlt, borderRadius: 10, border: `1px solid ${c.border}`, borderTop: `4px solid ${s.color}`, display: "flex", flexDirection: "column" }}>
+                <div style={{ padding: "14px 16px 0" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <span style={{ color: s.color, fontSize: 16, fontWeight: 700 }}>{s.show}</span>
+                    <span style={{ color: c.textDim, fontSize: 11 }}>{s.items.length} 集・均 {fmt(s.avg)}</span>
+                  </div>
+                </div>
+                {!s.items.length ? (
+                  <div style={{ padding: "24px 16px", color: c.textDim, fontSize: 13, textAlign: "center" }}>本期間無完整集數據</div>
+                ) : (
+                  <div style={{ flex: 1, maxHeight: 400, overflowY: "auto", padding: "0 16px 10px" }}>
+                    {s.items.map(v => {
+                      const ti = tierInfo[v.tier];
+                      return (
+                        <div key={v.id} style={{ padding: "8px 0", borderBottom: `1px solid ${c.border}` }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            <span style={{ background: ti.bg, color: ti.color, fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4, flexShrink: 0 }}>{v.tier}{ti.icon}</span>
+                            {v.topic && v.topic !== "未分類" && <span style={{ background: c.accent + "12", color: c.accent, fontSize: 9, padding: "1px 6px", borderRadius: 8 }}>{v.topic}</span>}
+                            <span style={{ color: c.textDim, fontSize: 9 }}>{ti.hint}</span>
+                          </div>
+                          <div style={{ color: c.text, fontSize: 12, marginBottom: 3, lineHeight: 1.4 }}>{v.ep ? `${v.ep}｜` : ""}{v.title.substring(0, 25)}{v.title.length > 25 ? "…" : ""}</div>
+                          <div style={{ display: "flex", gap: 10, fontSize: 11, color: c.textMuted }}>
+                            <span style={{ color: c.text, fontFamily: mono, fontWeight: 600 }}>{fmt(v.views)} 觀看</span>
+                            <span>{v.avgWatch} 均長</span>
+                            <span style={{ color: v.subs > 0 ? c.green : v.subs < 0 ? c.red : c.textDim }}>{v.subs > 0 ? `+${v.subs}` : v.subs} 訂閱</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {s.insight && (
+                  <div style={{ padding: "8px 16px 12px", borderTop: `1px solid ${s.color}20`, background: s.color + "08" }}>
+                    <div style={{ fontSize: 11, color: c.textMuted, lineHeight: 1.5 }}><span style={{ color: s.color, fontWeight: 600 }}>洞察：</span>{s.insight}</div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
