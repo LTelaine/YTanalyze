@@ -245,13 +245,14 @@ function SortableTable({ headers, dataKeys, data, renderRow, C, defaultSortKey, 
 
 // ── Shared components ──
 function KPI({ label, value, sub, color, C: c, title }) {
-  return (
-    <div title={title} style={{ background: c.card, borderRadius: 10, padding: "18px 20px", border: `1px solid ${c.border}`, flex: "1 1 140px", minWidth: 140, cursor: title ? "help" : "default" }}>
+  const inner = (
+    <div style={{ background: c.card, borderRadius: 10, padding: "18px 20px", border: `1px solid ${c.border}`, flex: "1 1 140px", minWidth: 140 }}>
       <div style={{ color: c.textMuted, fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
       <div style={{ color: color || c.text, fontSize: 26, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
       {sub && <div style={{ color: c.textDim, fontSize: 11, marginTop: 4 }}>{sub}</div>}
     </div>
   );
+  return title ? <Tip text={title} C={c}>{inner}</Tip> : inner;
 }
 
 function Section({ title, sub, children }) {
@@ -267,6 +268,34 @@ function Card({ children, style: s, C: c }) {
 }
 
 const TT = (c) => ({ background: c.card, border: `1px solid ${c.border}`, borderRadius: 8, color: c.text, fontSize: 12 });
+
+function Tip({ text, children, C: c, inline }) {
+  const [pos, setPos] = useState(null);
+  if (!text) return children;
+  const Tag = inline ? "span" : "div";
+  return (
+    <Tag style={{ display: inline ? "inline" : "contents" }}
+      onMouseEnter={e => setPos({ x: e.clientX, y: e.clientY })}
+      onMouseMove={e => setPos({ x: e.clientX, y: e.clientY })}
+      onMouseLeave={() => setPos(null)}>
+      {children}
+      {pos && (
+        <div style={{
+          position: "fixed", left: Math.min(pos.x + 14, window.innerWidth - 340), top: pos.y + 16,
+          zIndex: 9999, pointerEvents: "none",
+          background: c.card, border: `1px solid ${c.border}`,
+          borderRadius: 10, padding: "10px 14px",
+          boxShadow: `0 8px 30px rgba(0,0,0,${c.bg === "#08080A" ? "0.5" : "0.15"})`,
+          fontSize: 12, color: c.text, lineHeight: 1.6,
+          maxWidth: 320, whiteSpace: "pre-wrap",
+          backdropFilter: "blur(8px)",
+        }}>
+          {text}
+        </div>
+      )}
+    </Tag>
+  );
+}
 
 function VideoTitleCell({ v, C: c }) {
   const [pos, setPos] = useState(null);
@@ -469,7 +498,7 @@ function OverviewTab({ fullVideos, C: c }) {
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
             <td style={{ padding: "10px 14px", color: c.textDim }}>{i + 1}</td>
             <td style={{ padding: "10px 14px" }}><Tag text={v.show} color={c.colors6[SHOWS.indexOf(v.show) % 6]} C={c} /></td>
-            <td title={v.date} style={{ padding: "10px 14px", color: c.textMuted, cursor: "help" }}>{v.ep}</td>
+            <td style={{ padding: "10px 14px", color: c.textMuted }}><Tip text={v.date} C={c} inline>{v.ep}</Tip></td>
             <VideoTitleCell v={v} C={c} />
             <td style={{ padding: "10px 14px", color: c.textMuted, fontSize: 11, whiteSpace: "nowrap" }}>{v.traffic}</td>
             <td style={{ padding: "10px 14px", color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(v.views)}</td>
@@ -557,7 +586,7 @@ function CommercialTab({ fullVideos, formulaConfig: cfg = {}, C: c }) {
         data={fullVideos}
         renderRow={(v, i) => (
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
-            <td title={v.date} style={{ padding: "10px 14px", color: c.text, fontWeight: 500, cursor: "help" }}>{v.ep}</td>
+            <td style={{ padding: "10px 14px", color: c.text, fontWeight: 500 }}><Tip text={v.date} C={c} inline>{v.ep}</Tip></td>
             <td style={{ padding: "10px 14px" }}><Tag text={v.show} color={c.colors6[SHOWS.indexOf(v.show) % 6]} C={c} /></td>
             <td style={{ padding: "10px 14px", color: c.textMuted }}>{v.guest}</td>
             <td style={{ padding: "10px 14px", color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(v.views)}</td>
@@ -628,7 +657,7 @@ function OldVsNewTraffic({ fullVideos, C: c }) {
             <div style={{ fontSize: 12, color: c.accent, fontWeight: 600, marginBottom: 8 }}>新片 Top 3</div>
             {top3New.map((v, i) => (
               <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span title={v.title} style={{ color: c.text, fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i + 1}. {v.title}</span>
+                <Tip text={v.title} C={c} inline><span style={{ color: c.text, fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}>{i + 1}. {v.title}</span></Tip>
                 <span style={{ color: c.accent, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, marginLeft: 8 }}>{fmt(v.views)}</span>
               </div>
             ))}
@@ -637,7 +666,7 @@ function OldVsNewTraffic({ fullVideos, C: c }) {
             <div style={{ fontSize: 12, color: c.blue, fontWeight: 600, marginBottom: 8 }}>舊片 Top 3</div>
             {top3Old.map((v, i) => (
               <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span title={v.title} style={{ color: c.text, fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i + 1}. {v.title}</span>
+                <Tip text={v.title} C={c} inline><span style={{ color: c.text, fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}>{i + 1}. {v.title}</span></Tip>
                 <span style={{ color: c.blue, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, marginLeft: 8 }}>{fmt(v.views)}</span>
               </div>
             ))}
@@ -763,8 +792,8 @@ function ABTab({ abTests, abSuggestions, C: c }) {
     <Section title="測試變數效益分析" sub="議題包裝 vs 情緒框架 vs 混合，哪種測試方向 CTR 差距最大？">
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {varStats.map(v => (
-          <Card key={v.type} C={c} style={{ flex: "1 1 180px", minWidth: 170, cursor: "help" }}>
-            <div title={v.eps.join("\n")} style={{ color: c.text, fontWeight: 600, fontSize: 14, marginBottom: 12 }}>{v.type}</div>
+          <Tip key={v.type} text={v.eps.join("\n")} C={c}><Card C={c} style={{ flex: "1 1 180px", minWidth: 170 }}>
+            <div style={{ color: c.text, fontWeight: 600, fontSize: 14, marginBottom: 12 }}>{v.type}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <span style={{ color: c.textMuted, fontSize: 11 }}>測試次數</span>
               <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{v.count}</span>
@@ -777,7 +806,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
               <span style={{ color: c.textMuted, fontSize: 11 }}>B 版勝出</span>
               <span style={{ color: c.green, fontFamily: "'JetBrains Mono', monospace" }}>{v.wins.B}/{v.count}</span>
             </div>
-          </Card>
+          </Card></Tip>
         ))}
       </div>
     </Section>
@@ -799,11 +828,13 @@ function ABTab({ abTests, abSuggestions, C: c }) {
       </Card>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
         {frameStats.map(f => (
-          <Card key={f.frame} C={c} style={{ flex: "1 1 120px", minWidth: 120, padding: 14, cursor: "default" }}>
-            <div title={f.eps.join("\n")} style={{ fontSize: 11, color: c.textMuted, marginBottom: 4 }}>{f.frame}</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: frameColorMap[f.frame] || c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{f.winRate}%</div>
-            <div title={f.eps.join("、")} style={{ fontSize: 10, color: c.textDim, marginTop: 2, cursor: "help" }}>平均 CTR {f.avgCTR}% ・ {f.count} 次</div>
-          </Card>
+          <Tip key={f.frame} text={f.eps.join("\n")} C={c}>
+            <Card C={c} style={{ flex: "1 1 120px", minWidth: 120, padding: 14 }}>
+              <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 4 }}>{f.frame}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: frameColorMap[f.frame] || c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{f.winRate}%</div>
+              <div style={{ fontSize: 10, color: c.textDim, marginTop: 2 }}>平均 CTR {f.avgCTR}% ・ {f.count} 次</div>
+            </Card>
+          </Tip>
         ))}
       </div>
     </Section>
@@ -819,11 +850,11 @@ function ABTab({ abTests, abSuggestions, C: c }) {
           const isExpanded = expandedRow === t.ep;
           return [
             <tr key={t.ep} style={{ borderBottom: isExpanded ? "none" : `1px solid ${c.border}`, background: isExpanded ? c.sortHover : "transparent", transition: "background 0.15s" }}>
-              <td title={t.date} style={{ padding: "12px 14px", color: c.text, fontWeight: 500, cursor: "help" }}>{t.ep}</td>
+              <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500 }}><Tip text={t.date} C={c} inline>{t.ep}</Tip></td>
               <td style={{ padding: "12px 14px" }}><Tag text={t.show} color={c.colors6[SHOWS.indexOf(t.show) % 6]} C={c} /></td>
-              <td title={`A: ${t.topicAngleA || t.angleA || t.frameA}\nB: ${t.topicAngleB || t.angleB || t.frameB}`} style={{ padding: "12px 14px", cursor: "help" }}><Tag text={t.testVar} color={t.testVar === "情緒框架" ? c.purple : t.testVar === "議題包裝" ? c.teal : c.coral} C={c} /></td>
-              <td title={t.copyA} style={{ padding: "12px 14px", color: t.winner === "A" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "default" }}>{t.copyA}</td>
-              <td title={t.copyB} style={{ padding: "12px 14px", color: t.winner === "B" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "default" }}>{t.copyB}</td>
+              <td style={{ padding: "12px 14px" }}><Tip text={`A: ${t.topicAngleA || t.angleA || t.frameA}\nB: ${t.topicAngleB || t.angleB || t.frameB}`} C={c} inline><Tag text={t.testVar} color={t.testVar === "情緒框架" ? c.purple : t.testVar === "議題包裝" ? c.teal : c.coral} C={c} /></Tip></td>
+              <td style={{ padding: "12px 14px", color: t.winner === "A" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Tip text={t.copyA} C={c} inline>{t.copyA}</Tip></td>
+              <td style={{ padding: "12px 14px", color: t.winner === "B" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Tip text={t.copyB} C={c} inline>{t.copyB}</Tip></td>
               <td style={{ padding: "12px 14px", minWidth: 160 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1315,7 +1346,7 @@ function RevenueTab({ fullVideos, C: c }) {
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
             <td style={{ padding: "10px 14px", color: c.text, fontWeight: 500 }}>{v.ep}</td>
             <td style={{ padding: "10px 14px" }}><Tag text={v.show} color={c.colors6[SHOWS.indexOf(v.show) % 6]} C={c} /></td>
-            <td title={v.title} style={{ padding: "10px 14px", color: c.text, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.title}</td>
+            <td style={{ padding: "10px 14px", color: c.text, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Tip text={v.title} C={c} inline>{v.title}</Tip></td>
             <td style={{ padding: "10px 14px", color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(v.views)}</td>
             <td style={{ padding: "10px 14px", color: c.green, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>${v.estimatedRevenue.toFixed(2)}</td>
             <td style={{ padding: "10px 14px", color: c.accent, fontFamily: "'JetBrains Mono', monospace" }}>${v.cpm.toFixed(2)}</td>
@@ -1559,7 +1590,7 @@ function TATopicTab({ fullVideos, C: c }) {
                 <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: i < st.topics.length - 1 ? `1px solid ${c.border}` : "none" }}>
                   <span style={{ background: tierBg[v.tier], color: tierColor[v.tier], fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, minWidth: 24, textAlign: "center" }}>{v.tier}</span>
                   <span style={{ color: c.textMuted, fontSize: 10, minWidth: 38 }}>{fmtDateShort(v.date)}</span>
-                  <span title={v.title} style={{ color: c.text, fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.topic || v.title.substring(0, 20)}</span>
+                  <Tip text={v.title} C={c} inline><span style={{ color: c.text, fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}>{v.topic || v.title.substring(0, 20)}</span></Tip>
                   <span style={{ color: c.text, fontSize: 11, fontFamily: mono, minWidth: 45, textAlign: "right" }}>{fmt(v.views)}</span>
                   <span style={{ color: c.textDim, fontSize: 10, minWidth: 35, textAlign: "right" }}>{v.avgWatch}</span>
                 </div>
