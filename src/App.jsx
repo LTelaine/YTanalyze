@@ -1880,6 +1880,326 @@ function ActionTab({ fullVideos, abTests, abSuggestions, C: c }) {
   </div>);
 }
 
+// ── Report Modal ──
+function ReportModal({ allVideos, allAbTests, C: c, onClose }) {
+  const [page, setPage] = useState(0);
+  const [fade, setFade] = useState(true);
+  const totalPages = 6;
+  const mono = "'JetBrains Mono', monospace";
+
+  const now = new Date();
+  const fmtD = d => d.toISOString().slice(0, 10);
+  const monthStart = fmtD(new Date(now.getFullYear(), now.getMonth(), 1));
+  const monthEnd = fmtD(now);
+  const [startDate, setStartDate] = useState(monthStart);
+  const [endDate, setEndDate] = useState(monthEnd);
+
+  const setPreset = (key) => {
+    const t = new Date();
+    if (key === "thisMonth") { setStartDate(fmtD(new Date(t.getFullYear(), t.getMonth(), 1))); setEndDate(fmtD(t)); }
+    else if (key === "lastMonth") { const m = new Date(t.getFullYear(), t.getMonth() - 1, 1); setStartDate(fmtD(m)); setEndDate(fmtD(new Date(t.getFullYear(), t.getMonth(), 0))); }
+    else if (key === "30d") { setStartDate(fmtD(new Date(t.getTime() - 30 * 864e5))); setEndDate(fmtD(t)); }
+    else if (key === "90d") { setStartDate(fmtD(new Date(t.getTime() - 90 * 864e5))); setEndDate(fmtD(t)); }
+    else { setStartDate(""); setEndDate(""); }
+  };
+
+  const parseD = (s) => { if (!s) return null; return new Date(s.replace(/\//g, "-").replace(/ .*/, "")); };
+  const videos = useMemo(() => {
+    if (!startDate && !endDate) return allVideos;
+    const s = startDate ? new Date(startDate) : new Date(0);
+    const e = endDate ? new Date(endDate + "T23:59:59") : new Date();
+    return allVideos.filter(v => { const d = parseD(v.date); return d && d >= s && d <= e; });
+  }, [allVideos, startDate, endDate]);
+  const abTests = useMemo(() => {
+    if (!startDate && !endDate) return allAbTests;
+    const s = startDate ? new Date(startDate) : new Date(0);
+    const e = endDate ? new Date(endDate + "T23:59:59") : new Date();
+    return allAbTests.filter(t => { const d = parseD(t.date); return d && d >= s && d <= e; });
+  }, [allAbTests, startDate, endDate]);
+
+  const go = (dir) => { setFade(false); setTimeout(() => { setPage(p => Math.max(0, Math.min(totalPages - 1, p + dir))); setFade(true); }, 150); };
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); else if (e.key === "ArrowRight") go(1); else if (e.key === "ArrowLeft") go(-1); };
+    window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  const totalViews = videos.reduce((a, v) => a + v.views, 0);
+  const totalSubs = videos.reduce((a, v) => a + v.subs, 0);
+  const avgCI = videos.length ? +(videos.reduce((a, v) => a + v.commercialIdx, 0) / videos.length).toFixed(1) : 0;
+  const showNames = [...new Set(videos.map(v => v.show).filter(Boolean))];
+  const sc = SHOW_COLORS(c);
+
+  const btnStyle = (active) => ({ background: active ? c.accent + "25" : "none", border: `1px solid ${active ? c.accent : c.border}`, color: active ? c.accent : c.textMuted, borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'Noto Sans TC', sans-serif" });
+  const inputStyle = { background: c.card, color: c.text, border: `1px solid ${c.border}`, borderRadius: 6, padding: "4px 10px", fontSize: 12 };
+  const bigKPI = (label, value, color) => (
+    <div style={{ flex: "1 1 180px", textAlign: "center", padding: 20 }}>
+      <div style={{ color: c.textMuted, fontSize: 14, marginBottom: 8 }}>{label}</div>
+      <div style={{ color: color || c.text, fontSize: 40, fontWeight: 700, fontFamily: mono }}>{value}</div>
+    </div>
+  );
+
+  const slides = [
+    // ── Slide 1: Overview ──
+    () => (
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 16, color: c.textMuted, marginBottom: 8 }}>醍醐WAY</div>
+        <div style={{ fontSize: 32, fontWeight: 700, color: c.text, marginBottom: 4 }}>月度報告</div>
+        <div style={{ fontSize: 14, color: c.textDim, marginBottom: 40 }}>{startDate || "全部"} → {endDate || "至今"}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center", marginBottom: 30 }}>
+          {bigKPI("總觀看", fmt(totalViews), c.accent)}
+          {bigKPI("訂閱增長", totalSubs > 0 ? `+${totalSubs}` : String(totalSubs), totalSubs > 0 ? c.green : c.red)}
+          {bigKPI("平均商機", avgCI, c.accent)}
+          {bigKPI("影片數量", videos.length)}
+        </div>
+        {videos.length > 0 && (
+          <div style={{ fontSize: 14, color: c.textMuted }}>
+            平均每集觀看 {fmt(Math.round(totalViews / videos.length))} ・ 共 {showNames.length} 個節目
+          </div>
+        )}
+      </div>
+    ),
+    // ── Slide 2: AB Test ──
+    () => {
+      if (!abTests.length) return <div style={{ textAlign: "center", padding: 60, color: c.textDim, fontSize: 18 }}>本期間無 AB test 數據</div>;
+      const frameMap = {};
+      abTests.forEach(t => { const w = t.winner === "A" ? t.frameA : t.frameB; frameMap[w] = (frameMap[w] || 0) + 1; });
+      const pieData = Object.entries(frameMap).map(([name, value]) => ({ name, value }));
+      const frameColorMap = { "好奇懸念": c.accent, "恐懼損失": c.red, "實用承諾": c.blue, "權威背書": c.purple, "情感共鳴": c.pink, "社會認同": c.teal };
+      const topFrame = pieData.sort((a, b) => b.value - a.value)[0];
+      return (
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, textAlign: "center" }}>A/B Test 成果</div>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 240px", minWidth: 200 }}>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart><Pie data={pieData} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={3} strokeWidth={0} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                  {pieData.map((d, i) => <Cell key={i} fill={frameColorMap[d.name] || c.colors6[i]} />)}
+                </Pie><Tooltip contentStyle={TT(c)} /></PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ flex: "1 1 320px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {abTests.map(t => (
+                <div key={t.ep} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: c.cardAlt, borderRadius: 8, border: `1px solid ${c.border}` }}>
+                  <span style={{ color: c.text, fontWeight: 600, fontSize: 14, minWidth: 55 }}>{t.ep}</span>
+                  <span style={{ color: c.textMuted, fontSize: 12, flex: 1 }}>{t.copyA?.substring(0, 15)}… vs {t.copyB?.substring(0, 15)}…</span>
+                  <span style={{ color: c.green, fontFamily: mono, fontWeight: 700 }}>+{Math.abs(t.ctrB - t.ctrA).toFixed(1)}%</span>
+                  <span style={{ background: c.green + "18", color: c.green, padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600 }}>{t.winner}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginTop: 20, padding: "12px 16px", background: c.accent + "12", borderRadius: 8, textAlign: "center", fontSize: 15, color: c.text }}>
+            勝出框架以「<strong style={{ color: c.accent }}>{topFrame?.name}</strong>」為主（{topFrame?.value}/{abTests.length} 次），建議作為所有節目的預設標題框架
+          </div>
+        </div>
+      );
+    },
+    // ── Slide 3: CTR Comparison ──
+    () => {
+      if (!abTests.length) return <div style={{ textAlign: "center", padding: 60, color: c.textDim, fontSize: 18 }}>本期間無 AB test 數據</div>;
+      const sorted = [...abTests].sort((a, b) => Math.abs(b.ctrB - b.ctrA) - Math.abs(a.ctrB - a.ctrA));
+      const maxCTR = Math.max(...abTests.flatMap(t => [t.ctrA, t.ctrB])) || 1;
+      return (
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, textAlign: "center" }}>CTR 差距視覺化</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {sorted.map((t, i) => {
+              const gap = Math.abs(t.ctrB - t.ctrA);
+              const isMax = i === 0;
+              return (
+                <div key={t.ep} style={{ display: "flex", alignItems: "center", gap: 10, padding: isMax ? "10px 12px" : "6px 12px", background: isMax ? c.red + "10" : "transparent", borderRadius: 8, border: isMax ? `1px solid ${c.red}30` : "none" }}>
+                  <span style={{ color: c.text, fontWeight: 600, fontSize: 14, minWidth: 55 }}>{t.ep}</span>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
+                      <div style={{ background: t.winner === "A" ? c.green : c.textDim + "60", height: 22, width: `${t.ctrA / maxCTR * 100}%`, borderRadius: "4px 0 0 4px", minWidth: 30, display: "flex", alignItems: "center", justifyContent: "flex-start", paddingLeft: 6, fontSize: 11, color: "#fff", fontWeight: 600 }}>{t.ctrA}%</div>
+                    </div>
+                    <div style={{ width: 2, height: 22, background: c.border }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ background: t.winner === "B" ? c.green : c.textDim + "60", height: 22, width: `${t.ctrB / maxCTR * 100}%`, borderRadius: "0 4px 4px 0", minWidth: 30, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 6, fontSize: 11, color: "#fff", fontWeight: 600 }}>{t.ctrB}%</div>
+                    </div>
+                  </div>
+                  <span style={{ color: isMax ? c.red : c.accent, fontFamily: mono, fontWeight: 700, minWidth: 50, textAlign: "right" }}>+{gap.toFixed(1)}%</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 16, fontSize: 12, color: c.textMuted }}>
+            <span>← A 版</span><span>B 版 →</span><span style={{ color: c.green }}>■ 勝出</span>
+          </div>
+        </div>
+      );
+    },
+    // ── Slide 4: Topic Heat ──
+    () => {
+      const showCards = showNames.map(s => {
+        const sv = videos.filter(v => v.show === s);
+        if (!sv.length) return null;
+        const avg = sv.reduce((a, v) => a + v.views, 0) / sv.length;
+        return { show: s, color: sc[s] || c.accent, items: sv.map(v => ({ ...v, tier: v.views > avg * 2 ? "爆" : v.views < avg * 0.5 ? "低" : "穩" })).sort((a, b) => b.views - a.views) };
+      }).filter(Boolean);
+      const tierStyle = { "爆": { bg: c.red + "18", color: c.red, icon: "🔥" }, "穩": { bg: c.accent + "18", color: c.accent, icon: "" }, "低": { bg: c.textDim + "15", color: c.textDim, icon: "" } };
+      return (
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, textAlign: "center" }}>選題熱度</div>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(showCards.length, 3)}, 1fr)`, gap: 14 }}>
+            {showCards.map(s => (
+              <div key={s.show} style={{ background: c.cardAlt, borderRadius: 10, border: `1px solid ${c.border}`, borderTop: `4px solid ${s.color}`, padding: 16 }}>
+                <div style={{ color: s.color, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{s.show}</div>
+                {s.items.slice(0, 6).map(v => {
+                  const ts = tierStyle[v.tier];
+                  return (
+                    <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                      <span style={{ background: ts.bg, color: ts.color, fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 4, minWidth: 28, textAlign: "center" }}>{v.tier}{ts.icon}</span>
+                      <span style={{ color: c.text, fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.ep || v.title.substring(0, 15)}</span>
+                      <span style={{ color: c.textMuted, fontFamily: mono, fontSize: 12 }}>{fmt(v.views)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    },
+    // ── Slide 5: TA Insights ──
+    () => {
+      const wg = videos.filter(v => v.female > 0 || v.male > 0);
+      const avgF = wg.length ? +(wg.reduce((a, v) => a + v.female, 0) / wg.length).toFixed(1) : 0;
+      const avgM = wg.length ? +(wg.reduce((a, v) => a + v.male, 0) / wg.length).toFixed(1) : 0;
+      const ageCounts = {}; videos.filter(v => v.age).forEach(v => { ageCounts[v.age] = (ageCounts[v.age] || 0) + 1; });
+      const topAge = [...Object.entries(ageCounts)].sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
+      const genderData = [{ name: "女性", value: avgF }, { name: "男性", value: avgM }];
+      const insights = [];
+      if (topAge !== "N/A") insights.push(`主力年齡層 ${topAge} 歲，佔比最高`);
+      if (avgF > avgM) insights.push(`女性觀眾 ${avgF}% 佔多數，適合偏向生活/心理/健康議題`);
+      else if (avgM > avgF) insights.push(`男性觀眾 ${avgM}% 佔多數，適合偏向理財/科技/法律議題`);
+      insights.push("觀眾最活躍時段：平日 19:00-22:00，建議 17:00-18:00 上架");
+      return (
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, textAlign: "center" }}>TA 洞察</div>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center", marginBottom: 24 }}>
+            <div style={{ textAlign: "center" }}>
+              <ResponsiveContainer width={200} height={200}>
+                <PieChart><Pie data={genderData} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} strokeWidth={0}>
+                  <Cell fill={c.pink} /><Cell fill={c.blue} />
+                </Pie></PieChart>
+              </ResponsiveContainer>
+              <div style={{ fontSize: 13, color: c.textMuted }}>
+                <span style={{ color: c.pink }}>女 {avgF}%</span> ・ <span style={{ color: c.blue }}>男 {avgM}%</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 12 }}>
+              <div style={{ fontSize: 14, color: c.textMuted }}>主力年齡層</div>
+              <div style={{ fontSize: 48, fontWeight: 700, color: c.accent, fontFamily: mono }}>{topAge}</div>
+              <div style={{ fontSize: 13, color: c.textDim }}>歲</div>
+            </div>
+            <div style={{ display: "inline-grid", gridTemplateColumns: "repeat(24, 10px)", gridTemplateRows: "repeat(7, 10px)", gap: 2 }}>
+              {ACTIVITY_DATA.data.flatMap((row, di) => row.map((val, hi) => {
+                const t = val / 10;
+                const isDk = c.bg === "#08080A";
+                const bg = isDk ? `rgba(139,92,246,${Math.max(t * 0.9 + 0.1, 0.08).toFixed(2)})` : `rgb(${Math.round(245 - t * 121)},${Math.round(243 - t * 185)},${Math.round(238 - t * 1)})`;
+                return <div key={`${di}-${hi}`} style={{ width: 10, height: 10, borderRadius: 2, background: bg }} />;
+              }))}
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {insights.map((ins, i) => (
+              <div key={i} style={{ padding: "10px 16px", background: c.accent + "10", borderRadius: 8, borderLeft: `3px solid ${c.accent}`, fontSize: 15, color: c.text }}>{ins}</div>
+            ))}
+          </div>
+        </div>
+      );
+    },
+    // ── Slide 6: Next Actions ──
+    () => {
+      const best = [...videos].sort((a, b) => b.views - a.views)[0];
+      const worst = [...videos].sort((a, b) => a.views - b.views)[0];
+      const showAvgs = showNames.map(s => { const sv = videos.filter(v => v.show === s); return { show: s, avg: sv.length ? Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length) : 0 }; }).sort((a, b) => a.avg - b.avg);
+      const weakShow = showAvgs[0];
+      const topFrame = (() => { const m = {}; abTests.forEach(t => { const w = t.winner === "A" ? t.frameA : t.frameB; m[w] = (m[w] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1])[0]?.[0] || "好奇懸念"; })();
+
+      const cards = [
+        { tag: "文案策略", color: c.accent, items: [
+          `預設「${topFrame}」作為標題框架`,
+          abTests.length ? `本月最大 CTR 差距 ${Math.max(...abTests.map(t => Math.abs(t.ctrB - t.ctrA))).toFixed(1)}%，持續複製成功模式` : "開始執行 AB 縮圖測試",
+          "避免「實用承諾」語氣（N招教你…），改用反轉包裝",
+        ]},
+        { tag: "選題方向", color: c.blue, items: [
+          best ? `複製最強集模式：${best.ep || ""} ${best.show}（${fmt(best.views)}）` : "累積更多數據",
+          worst ? `分析最弱集原因：${worst.ep || ""} ${worst.show}（${fmt(worst.views)}）` : "",
+          "觀眾重疊財經類頻道，可加碼理財 × 防詐交叉題材",
+        ].filter(Boolean)},
+        { tag: "TA 經營", color: c.green, items: [
+          "最佳上架時段：平日 17:00-18:00",
+          weakShow ? `重點關注「${weakShow.show}」（平均 ${fmt(weakShow.avg)}），需強化標題吸引力` : "",
+          "Shorts 導流到完整集，擴大訂閱轉換",
+        ].filter(Boolean)},
+        { tag: "AB Test 計畫", color: c.purple, items: [
+          "每集都做 A/B 縮圖測試，累積至少 5 次數據",
+          `固定用「${topFrame}」框架，每次只測一個議題包裝變數`,
+          "測試 48 小時後切換為勝出版本",
+        ]},
+      ];
+      return (
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, textAlign: "center" }}>下月行動建議</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+            {cards.map(card => (
+              <div key={card.tag} style={{ background: c.cardAlt, borderRadius: 10, border: `1px solid ${c.border}`, borderTop: `4px solid ${card.color}`, padding: 18 }}>
+                <div style={{ color: card.color, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{card.tag}</div>
+                {card.items.map((item, j) => (
+                  <div key={j} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                    <span style={{ color: card.color, fontSize: 10, marginTop: 5 }}>●</span>
+                    <span style={{ color: c.text, fontSize: 14, lineHeight: 1.7 }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    },
+  ];
+
+  const pageTitles = ["本月總覽", "AB Test 成果", "CTR 差距", "選題熱度", "TA 洞察", "行動建議"];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ background: c.bg, borderRadius: 16, width: "95vw", maxWidth: 960, maxHeight: "92vh", overflow: "hidden", display: "flex", flexDirection: "column", border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: `1px solid ${c.border}`, flexShrink: 0, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} />
+            <span style={{ color: c.textDim }}>→</span>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
+            {[["本月", "thisMonth"], ["上月", "lastMonth"], ["30天", "30d"], ["90天", "90d"], ["全部", "all"]].map(([label, key]) => (
+              <button key={key} onClick={() => setPreset(key)} style={btnStyle(key === "thisMonth" && startDate === monthStart)}>{label}</button>
+            ))}
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: c.textMuted, fontSize: 22, cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}>✕</button>
+        </div>
+        {/* Slide */}
+        <div style={{ flex: 1, overflow: "auto", padding: "32px 40px", transition: "opacity 0.15s", opacity: fade ? 1 : 0 }}>
+          {slides[page]()}
+        </div>
+        {/* Footer */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 24px", borderTop: `1px solid ${c.border}`, flexShrink: 0 }}>
+          <button onClick={() => go(-1)} disabled={page === 0} style={{ background: page === 0 ? "none" : c.accent + "18", border: `1px solid ${page === 0 ? c.border : c.accent}`, color: page === 0 ? c.textDim : c.accent, borderRadius: 8, padding: "8px 20px", fontSize: 14, cursor: page === 0 ? "default" : "pointer", fontFamily: "'Noto Sans TC', sans-serif" }}>← 上一頁</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", gap: 6 }}>
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <div key={i} onClick={() => { setFade(false); setTimeout(() => { setPage(i); setFade(true); }, 150); }} style={{ width: i === page ? 20 : 8, height: 8, borderRadius: 4, background: i === page ? c.accent : c.textDim + "40", cursor: "pointer", transition: "all 0.2s" }} />
+              ))}
+            </div>
+            <span style={{ color: c.textDim, fontSize: 12, fontFamily: mono }}>{page + 1}/{totalPages}</span>
+          </div>
+          <button onClick={() => go(1)} disabled={page === totalPages - 1} style={{ background: page === totalPages - 1 ? "none" : c.accent + "18", border: `1px solid ${page === totalPages - 1 ? c.border : c.accent}`, color: page === totalPages - 1 ? c.textDim : c.accent, borderRadius: 8, padding: "8px 20px", fontSize: 14, cursor: page === totalPages - 1 ? "default" : "pointer", fontFamily: "'Noto Sans TC', sans-serif" }}>下一頁 →</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──
 export default function App() {
   const [tab, setTab] = useState(0);
@@ -1890,6 +2210,7 @@ export default function App() {
   const zoomMap = { small: 0.88, medium: 1, large: 1.12 };
   const [rawData, setRawData] = useState(null);
   const [dateRange, setDateRange] = useState("all");
+  const [showReport, setShowReport] = useState(false);
   const c = isDark ? themes.dark : themes.light;
 
   useEffect(() => {
@@ -1951,6 +2272,11 @@ export default function App() {
               <option value="30d">近 30 天</option>
               <option value="90d">近 3 個月</option>
             </select>
+            <button onClick={() => setShowReport(true)} style={{
+              background: c.accent, color: "#fff", border: "none", borderRadius: 6,
+              padding: "6px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600,
+              fontFamily: "'Noto Sans TC', sans-serif", whiteSpace: "nowrap", transition: "opacity 0.2s",
+            }} onMouseEnter={e => e.target.style.opacity = "0.85"} onMouseLeave={e => e.target.style.opacity = "1"}>月報簡報</button>
             <FontSizeControl value={fontSize} onChange={setFontSize} C={c} />
             <WidthSwitch isFullWidth={isFullWidth} toggle={() => setIsFullWidth(!isFullWidth)} C={c} />
             <ThemeSwitch isDark={isDark} toggle={() => setIsDark(!isDark)} C={c} />
@@ -1979,6 +2305,7 @@ export default function App() {
         {tab === 7 && <TATopicTab fullVideos={filteredVideos} C={c} />}
         {tab === 8 && <ActionTab fullVideos={filteredVideos} abTests={abTests} abSuggestions={abSuggestions} C={c} />}
       </div>
+      {showReport && <ReportModal allVideos={fullVideos} allAbTests={abTests} C={c} onClose={() => setShowReport(false)} />}
     </div>
   );
 }
