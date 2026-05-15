@@ -1023,6 +1023,75 @@ function SearchTermsChart({ videos, C: c }) {
   );
 }
 
+// ── Competitor Channels ──
+const COMPETITOR_CHANNELS = [
+  { cat: "財經理財", name: "游庭皓的財經皓角", subs: "65.0萬", url: "https://www.youtube.com/@yutinghao" },
+  { cat: "財經理財", name: "鈔錢部署－華視優選", subs: "68.8萬", url: "https://www.youtube.com/@moneysmartctstv" },
+  { cat: "財經理財", name: "TVBS財經", subs: "59.7萬", url: "https://www.youtube.com/@tvbsmoney" },
+  { cat: "財經理財", name: "玩股網楚狂人", subs: "11.0萬", url: "https://www.youtube.com/@wantgoo" },
+  { cat: "財經理財", name: "自由女神邱沁宜", subs: "26.6萬", url: "https://www.youtube.com/@ladylibertytw" },
+  { cat: "財經理財", name: "哈佛商業評論", subs: "10.2萬", url: "https://www.youtube.com/@haborhbr" },
+  { cat: "財經理財", name: "李永年", subs: "16.7萬", url: "https://www.youtube.com/@leon888" },
+  { cat: "新聞談話", name: "新聞挖挖哇！", subs: "135.0萬", url: "https://www.youtube.com/@newswawawa" },
+  { cat: "新聞談話", name: "風傳媒 The Storm Media", subs: "246.0萬", url: "https://www.youtube.com/@stormmedia" },
+  { cat: "新聞談話", name: "關我什麼事", subs: "49.7萬", url: "https://www.youtube.com/@gwsms" },
+  { cat: "新聞談話", name: "震震有詞", subs: "3.3萬", url: "https://www.youtube.com/@zzyzshow" },
+  { cat: "心理成長", name: "Sherry's Notes 雪力的心理學筆記", subs: "52.8萬", url: "https://www.youtube.com/@sherrynotes" },
+  { cat: "商業創業", name: "陳修平的師父商學院", subs: "8.2萬", url: "https://www.youtube.com/@joeychen-shifu" },
+  { cat: "綜合知識", name: "小宇宙大爆發", subs: "48.0萬", url: "https://www.youtube.com/@bigbanguniverse" },
+  { cat: "綜合知識", name: "天天都有新鮮事", subs: "9.8萬", url: "https://www.youtube.com/@dailyfresh" },
+];
+
+const CAT_COLORS = { "財經理財": "#E8A630", "新聞談話": "#3B82F6", "心理成長": "#D946A8", "商業創業": "#14B8A6", "綜合知識": "#8B5CF6" };
+
+function CompetitorChannels({ C: c }) {
+  const grouped = useMemo(() => {
+    const map = {};
+    COMPETITOR_CHANNELS.forEach(ch => {
+      if (!map[ch.cat]) map[ch.cat] = [];
+      map[ch.cat].push(ch);
+    });
+    return Object.entries(map).sort((a, b) => b[1].length - a[1].length);
+  }, []);
+
+  return (
+    <Section title="觀眾也在看的頻道" sub="YouTube Studio → 觀眾 → 觀眾觀賞的頻道">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+        {grouped.map(([cat, channels]) => {
+          const color = CAT_COLORS[cat] || c.accent;
+          return (
+            <Card key={cat} C={c} style={{ borderTop: `3px solid ${color}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ color, fontSize: 14, fontWeight: 700 }}>{cat}</span>
+                <span style={{ color: c.textDim, fontSize: 11 }}>{channels.length} 個頻道</span>
+              </div>
+              {channels.map(ch => (
+                <div key={ch.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${c.border}` }}>
+                  <a href={ch.url} target="_blank" rel="noopener noreferrer"
+                    style={{ color: c.text, fontSize: 12, textDecoration: "none", cursor: "pointer" }}
+                    onMouseEnter={e => e.target.style.textDecoration = "underline"}
+                    onMouseLeave={e => e.target.style.textDecoration = "none"}>
+                    {ch.name}
+                  </a>
+                  <span style={{ color: c.textMuted, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, marginLeft: 8 }}>{ch.subs}</span>
+                </div>
+              ))}
+              {cat === "財經理財" && (
+                <div style={{ marginTop: 10, padding: "8px 10px", background: color + "12", borderRadius: 6, fontSize: 11, color: c.textMuted, lineHeight: 1.6 }}>
+                  <span style={{ color, fontWeight: 600 }}>洞察：</span>觀眾高度重疊財經類頻道，財務安全感是最強 TA 驅動力
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 12, fontSize: 10, color: c.textDim, textAlign: "center" }}>
+        資料來源：YouTube Studio → 觀眾 → 觀眾觀賞的頻道 ・ 最後更新：2026/05/15
+      </div>
+    </Section>
+  );
+}
+
 // ── Tab: TA ──
 function TATab({ fullVideos, selectedShow, C: c }) {
   const sv = selectedShow === "全部" ? fullVideos : fullVideos.filter(v => v.show === selectedShow);
@@ -1059,6 +1128,7 @@ function TATab({ fullVideos, selectedShow, C: c }) {
     </Section>
     <SubscriberAnalysis videos={sv} C={c} />
     <SearchTermsChart videos={sv} C={c} />
+    <CompetitorChannels C={c} />
   </div>);
 }
 
