@@ -244,9 +244,9 @@ function SortableTable({ headers, dataKeys, data, renderRow, C, defaultSortKey, 
 }
 
 // ── Shared components ──
-function KPI({ label, value, sub, color, C: c }) {
+function KPI({ label, value, sub, color, C: c, title }) {
   return (
-    <div style={{ background: c.card, borderRadius: 10, padding: "18px 20px", border: `1px solid ${c.border}`, flex: "1 1 140px", minWidth: 140 }}>
+    <div title={title} style={{ background: c.card, borderRadius: 10, padding: "18px 20px", border: `1px solid ${c.border}`, flex: "1 1 140px", minWidth: 140, cursor: title ? "help" : "default" }}>
       <div style={{ color: c.textMuted, fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
       <div style={{ color: color || c.text, fontSize: 26, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
       {sub && <div style={{ color: c.textDim, fontSize: 11, marginTop: 4 }}>{sub}</div>}
@@ -269,18 +269,20 @@ function Card({ children, style: s, C: c }) {
 const TT = (c) => ({ background: c.card, border: `1px solid ${c.border}`, borderRadius: 8, color: c.text, fontSize: 12 });
 
 function VideoTitleCell({ v, C: c }) {
-  const [hover, setHover] = useState(false);
+  const [pos, setPos] = useState(null);
+  const handleEnter = (e) => setPos({ x: e.clientX, y: e.clientY });
+  const handleLeave = () => setPos(null);
   return (
-    <td style={{ padding: "10px 14px", position: "relative" }}>
+    <td style={{ padding: "10px 14px" }}>
       <a href={`https://www.youtube.com/watch?v=${v.id}`} target="_blank" rel="noopener noreferrer"
-        onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-        style={{ color: c.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", textDecoration: hover ? "underline" : "none", cursor: "pointer" }}>
+        onMouseEnter={handleEnter} onMouseMove={handleEnter} onMouseLeave={handleLeave}
+        style={{ color: c.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", textDecoration: pos ? "underline" : "none", cursor: "pointer" }}>
         {v.title}
       </a>
-      {hover && (
-        <div style={{ position: "absolute", bottom: "100%", left: 0, zIndex: 20, background: c.card, border: `1px solid ${c.border}`, borderRadius: 8, padding: 6, boxShadow: "0 4px 12px rgba(0,0,0,0.3)", pointerEvents: "none" }}>
-          <img src={`https://img.youtube.com/vi/${v.id}/mqdefault.jpg`} alt="" style={{ width: 220, borderRadius: 4, display: "block" }} />
-          <div style={{ fontSize: 11, color: c.textMuted, marginTop: 4, maxWidth: 220, whiteSpace: "normal" }}>{v.title}</div>
+      {pos && (
+        <div style={{ position: "fixed", left: pos.x + 12, top: Math.max(pos.y - 180, 10), zIndex: 9999, background: c.card, border: `1px solid ${c.border}`, borderRadius: 8, padding: 6, boxShadow: "0 8px 24px rgba(0,0,0,0.4)", pointerEvents: "none" }}>
+          <img src={`https://img.youtube.com/vi/${v.id}/mqdefault.jpg`} alt="" style={{ width: 240, borderRadius: 4, display: "block" }} />
+          <div style={{ fontSize: 11, color: c.textMuted, marginTop: 4, maxWidth: 240, whiteSpace: "normal" }}>{v.title}</div>
         </div>
       )}
     </td>
@@ -429,11 +431,11 @@ function OverviewTab({ fullVideos, C: c }) {
   const total = fullVideos.reduce((a, v) => ({ views: a.views + v.views, subs: a.subs + v.subs }), { views: 0, subs: 0 });
   const avgCIdx = (fullVideos.reduce((a, v) => a + v.commercialIdx, 0) / fullVideos.length).toFixed(1);
 
-  const showStats = SHOWS.filter(s => s !== "全部").map(s => {
+  const showStats = [...new Set(fullVideos.map(v => v.show).filter(Boolean))].map(s => {
     const sv = fullVideos.filter(v => v.show === s);
     if (!sv.length) return null;
     return { show: s, count: sv.length, totalViews: sv.reduce((a, v) => a + v.views, 0), avgViews: Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length), totalSubs: sv.reduce((a, v) => a + v.subs, 0), avgInteract: +(sv.reduce((a, v) => a + v.interactRate, 0) / sv.length).toFixed(2), avgCommercial: +(sv.reduce((a, v) => a + v.commercialIdx, 0) / sv.length).toFixed(1) };
-  }).filter(Boolean);
+  }).filter(Boolean).sort((a, b) => b.totalViews - a.totalViews);
 
   return (<div>
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -521,7 +523,7 @@ function CommercialTab({ fullVideos, formulaConfig: cfg = {}, C: c }) {
             <Tooltip contentStyle={TT(c)} content={({ active, payload }) => {
               if (!active || !payload?.[0]) return null;
               const d = payload[0].payload;
-              return <div style={{ ...TT(c), padding: "8px 12px" }}><div style={{ fontWeight: 600, marginBottom: 2 }}>{d.ep} {d.show}</div><div>商機：{d.commercialIdx.toFixed(2)}</div></div>;
+              return <div style={{ ...TT(c), padding: "8px 12px" }}><div style={{ fontWeight: 600, marginBottom: 2 }}>{d.show} {d.ep}</div><div style={{ fontSize: 11, color: c.textMuted, marginBottom: 4, maxWidth: 220 }}>{d.title}</div><div>商機：{d.commercialIdx.toFixed(2)}</div></div>;
             }} />
             <Bar dataKey="commercialIdx" name="商機" radius={[0, 5, 5, 0]}>
               {sorted.slice(0, 10).map((v, i) => <Cell key={i} fill={v.commercialIdx >= 6 ? c.green : v.commercialIdx >= 4 ? c.accent : c.red} />)}
@@ -724,10 +726,11 @@ function ABTab({ abTests, abSuggestions, C: c }) {
   const varStats = useMemo(() => {
     const map = {};
     abTests.forEach(t => {
-      if (!map[t.testVar]) map[t.testVar] = { type: t.testVar, count: 0, totalGap: 0, wins: { A: 0, B: 0 } };
+      if (!map[t.testVar]) map[t.testVar] = { type: t.testVar, count: 0, totalGap: 0, wins: { A: 0, B: 0 }, eps: [] };
       map[t.testVar].count++;
       map[t.testVar].totalGap += Math.abs(t.ctrB - t.ctrA);
       map[t.testVar].wins[t.winner]++;
+      map[t.testVar].eps.push(`${t.show} ${t.ep}`);
     });
     return Object.values(map).map(v => ({ ...v, avgGap: +(v.totalGap / v.count).toFixed(1) }));
   }, []);
@@ -750,18 +753,18 @@ function ABTab({ abTests, abSuggestions, C: c }) {
   return (<div>
     {/* KPI row */}
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-      <KPI label="總測試次數" value={abTests.length} C={c} />
-      <KPI label="B 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "B").length / abTests.length * 100)}%`} color={c.green} C={c} />
-      <KPI label="平均 CTR 差距" value={`${(abTests.reduce((a, t) => a + Math.abs(t.ctrB - t.ctrA), 0) / abTests.length).toFixed(1)}%`} color={c.accent} C={c} />
-      <KPI label="最大 CTR 差距" value={`${Math.max(...abTests.map(t => Math.abs(t.ctrB - t.ctrA))).toFixed(1)}%`} sub="EP17 防詐特攻隊" color={c.coral} C={c} />
+      <KPI label="總測試次數" value={abTests.length} C={c} title={abTests.map(t => `${t.show} ${t.ep}`).join("\n")} />
+      <KPI label="B 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "B").length / abTests.length * 100)}%`} color={c.green} C={c} title={`B 勝出：\n${abTests.filter(t => t.winner === "B").map(t => `${t.show} ${t.ep}`).join("\n")}`} />
+      <KPI label="平均 CTR 差距" value={`${(abTests.reduce((a, t) => a + Math.abs(t.ctrB - t.ctrA), 0) / abTests.length).toFixed(1)}%`} color={c.accent} C={c} title={abTests.map(t => `${t.show} ${t.ep}: ${Math.abs(t.ctrB - t.ctrA).toFixed(1)}%`).join("\n")} />
+      <KPI label="最大 CTR 差距" value={`${Math.max(...abTests.map(t => Math.abs(t.ctrB - t.ctrA))).toFixed(1)}%`} sub={(() => { const t = abTests.reduce((a, b) => Math.abs(b.ctrB - b.ctrA) > Math.abs(a.ctrB - a.ctrA) ? b : a); return `${t.show} ${t.ep}`; })()} color={c.coral} C={c} />
     </div>
 
     {/* Test Variable Analysis */}
     <Section title="測試變數效益分析" sub="議題包裝 vs 情緒框架 vs 混合，哪種測試方向 CTR 差距最大？">
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {varStats.map(v => (
-          <Card key={v.type} C={c} style={{ flex: "1 1 180px", minWidth: 170 }}>
-            <div style={{ color: c.text, fontWeight: 600, fontSize: 14, marginBottom: 12 }}>{v.type}</div>
+          <Card key={v.type} C={c} style={{ flex: "1 1 180px", minWidth: 170, cursor: "help" }}>
+            <div title={v.eps.join("\n")} style={{ color: c.text, fontWeight: 600, fontSize: 14, marginBottom: 12 }}>{v.type}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <span style={{ color: c.textMuted, fontSize: 11 }}>測試次數</span>
               <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{v.count}</span>
