@@ -1651,27 +1651,201 @@ function GuestTab({ fullVideos, C: c }) {
 }
 
 // ── Tab: Actions ──
-function ActionTab({ C: c }) {
-  const blocks = [
-    { title: "文案策略", color: c.accent, items: ["預設「好奇懸念」框架，勝率 78%", "防詐混搭「恐懼損失」+ 具體金額", "醫起好健康用「權威背書」+ 好奇包裝", "避免純「實用承諾」，勝率僅 22%"] },
-    { title: "選題方向", color: c.blue, items: ["法律與社會案件：觀看數最高，持續加碼", "理財與房產：觀看時長最長，適合深度內容", "命理與占卜：高時長 + 高女性比例，忠誠群", "心理與自我成長：觀看高但需精選來賓", "職場與職涯：表現偏弱，考慮與教養結合", "科技與科學：AI 有潛力但樣本少"] },
-    { title: "TA 經營", color: c.green, items: ["防詐 → 45-54 男性，真實案例 + 金額", "授ㄉㄟ私捏 → 45-54 女性，焦慮 + 方法", "醫起好健康 → 35-54 女性，SEO 標題", "命理類女性 81.7%，可加碼"] },
-    { title: "來賓策略", color: c.purple, items: ["優先再邀：朱仲翔、王珮蓓、盧美妏", "謝晨彥穩定產出，考慮固定合作", "丹倫兩集觀看偏低，調整主題包裝", "醫起好健康來賓效應待更多數據"] },
-  ];
+function ActionTab({ fullVideos, abTests, abSuggestions, C: c }) {
+  const mono = "'JetBrains Mono', monospace";
+  const showNames = [...new Set(fullVideos.map(v => v.show).filter(Boolean))];
+
+  // ── Period highlights ──
+  const highlights = useMemo(() => {
+    if (!fullVideos.length) return {};
+    const sorted = [...fullVideos].sort((a, b) => b.views - a.views);
+    const best = sorted[0];
+    const worst = sorted[sorted.length - 1];
+    const totalViews = fullVideos.reduce((a, v) => a + v.views, 0);
+    const totalSubs = fullVideos.reduce((a, v) => a + v.subs, 0);
+    const avgViews = Math.round(totalViews / fullVideos.length);
+
+    const showAvgs = showNames.map(s => {
+      const sv = fullVideos.filter(v => v.show === s);
+      return { show: s, avg: sv.length ? Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length) : 0, count: sv.length };
+    }).sort((a, b) => a.avg - b.avg);
+    const weakShow = showAvgs[0];
+    const strongShow = showAvgs[showAvgs.length - 1];
+
+    return { best, worst, totalViews, totalSubs, avgViews, weakShow, strongShow, count: fullVideos.length };
+  }, [fullVideos]);
+
+  // ── AB insights ──
+  const abInsights = useMemo(() => {
+    if (!abTests.length) return { topFrame: "", topFrameRate: 0, worstFrame: "", formulas: [] };
+    const frameMap = {};
+    abTests.forEach(t => {
+      [{ f: t.frameA, won: t.winner === "A" }, { f: t.frameB, won: t.winner === "B" }].forEach(({ f, won }) => {
+        if (!frameMap[f]) frameMap[f] = { wins: 0, total: 0 };
+        frameMap[f].total++; if (won) frameMap[f].wins++;
+      });
+    });
+    const frames = Object.entries(frameMap).map(([f, d]) => ({ frame: f, rate: Math.round(d.wins / d.total * 100), ...d })).sort((a, b) => b.rate - a.rate);
+    const topFrame = frames[0];
+    const worstFrame = frames[frames.length - 1];
+    return { topFrame: topFrame?.frame || "", topFrameRate: topFrame?.rate || 0, worstFrame: worstFrame?.frame || "", worstFrameRate: worstFrame?.rate || 0 };
+  }, [abTests]);
+
+  // ── Show-specific recommendations ──
+  const showCards = useMemo(() => {
+    return showNames.map(s => {
+      const sv = fullVideos.filter(v => v.show === s);
+      if (!sv.length) return null;
+      const avgViews = Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length);
+      const totalSubs = sv.reduce((a, v) => a + v.subs, 0);
+      const avgInteract = +(sv.reduce((a, v) => a + v.interactRate, 0) / sv.length).toFixed(2);
+      const bestVid = [...sv].sort((a, b) => b.views - a.views)[0];
+      const worstVid = [...sv].sort((a, b) => a.views - b.views)[0];
+      const topAge = (() => { const m = {}; sv.filter(v => v.age).forEach(v => { m[v.age] = (m[v.age] || 0) + 1; }); const e = Object.entries(m).sort((a, b) => b[1] - a[1]); return e[0]?.[0] || "N/A"; })();
+      const fPct = sv.filter(v => v.female > 0).length ? +(sv.filter(v => v.female > 0).reduce((a, v) => a + v.female, 0) / sv.filter(v => v.female > 0).length).toFixed(0) : 0;
+
+      const strengths = [];
+      const actions = [];
+      if (avgViews > (highlights.avgViews || 0)) strengths.push(`平均觀看 ${fmt(avgViews)} 高於頻道均值 ${fmt(highlights.avgViews || 0)}`);
+      else actions.push(`平均觀看 ${fmt(avgViews)} 低於頻道均值 ${fmt(highlights.avgViews || 0)}，需強化縮圖文案`);
+      if (totalSubs > 0) strengths.push(`帶來 +${totalSubs} 訂閱`);
+      if (avgInteract > 3) strengths.push(`互動率 ${avgInteract}% 表現佳`);
+      else actions.push(`互動率 ${avgInteract}%，考慮在影片中加入更多 CTA`);
+      if (fPct > 60) strengths.push(`女性 ${fPct}%，可深耕女性議題`);
+      actions.push(`最強集：${bestVid.ep || bestVid.title.substring(0, 12)}（${fmt(bestVid.views)}），複製其選題模式`);
+      if (worstVid.id !== bestVid.id) actions.push(`最弱集：${worstVid.ep || worstVid.title.substring(0, 12)}（${fmt(worstVid.views)}），分析掉量原因`);
+
+      return { show: s, count: sv.length, avgViews, topAge, fPct, strengths, actions };
+    }).filter(Boolean).sort((a, b) => b.avgViews - a.avgViews);
+  }, [fullVideos, highlights]);
+
+  // ── Guest insights ──
+  const guestInsight = useMemo(() => {
+    const map = {};
+    fullVideos.filter(v => v.guest).forEach(v => {
+      if (!map[v.guest]) map[v.guest] = { name: v.guest, views: 0, count: 0 };
+      map[v.guest].views += v.views; map[v.guest].count++;
+    });
+    const arr = Object.values(map).sort((a, b) => b.views / b.count - a.views / a.count);
+    return { top: arr.slice(0, 3), bottom: arr.filter(g => g.count >= 1).slice(-2) };
+  }, [fullVideos]);
+
+  // ── AB suggestion blocks from Sheet ──
+  const suggBlocks = useMemo(() => {
+    const map = {};
+    (abSuggestions || []).forEach(({ block, item }) => {
+      if (!map[block]) map[block] = [];
+      map[block].push(item);
+    });
+    return map;
+  }, [abSuggestions]);
+
+  const priorityColors = { "now": c.red, "month": c.accent, "long": c.blue };
+
   return (<div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
-      {blocks.map(b => (
-        <Card key={b.title} C={c} style={{ borderTop: `3px solid ${b.color}` }}>
-          <div style={{ color: b.color, fontSize: 14, fontWeight: 600, marginBottom: 14 }}>{b.title}</div>
-          {b.items.map((item, j) => (
-            <div key={j} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-              <span style={{ color: b.color, fontSize: 8, marginTop: 5 }}>●</span>
-              <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6 }}>{item}</span>
+    {/* ── Period KPIs ── */}
+    {highlights.best && (
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <KPI label="最佳表現" value={fmt(highlights.best.views)} sub={`${highlights.best.ep || ""} ${highlights.best.show}`} color={c.green} C={c} />
+        <KPI label="需關注" value={fmt(highlights.worst.views)} sub={`${highlights.worst.ep || ""} ${highlights.worst.show}`} color={c.red} C={c} />
+        <KPI label="頻道均值" value={fmt(highlights.avgViews)} sub={`${highlights.count} 支影片`} C={c} />
+        <KPI label="訂閱增長" value={highlights.totalSubs > 0 ? `+${highlights.totalSubs}` : String(highlights.totalSubs)} color={highlights.totalSubs > 0 ? c.green : c.red} C={c} />
+        {abInsights.topFrame && <KPI label="最強框架" value={abInsights.topFrame} sub={`勝率 ${abInsights.topFrameRate}%（${abTests.length} 次測試）`} color={c.accent} C={c} />}
+      </div>
+    )}
+
+    {/* ── Priority Actions ── */}
+    <Section title="優先行動" sub="按緊急程度排序">
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {[
+          highlights.weakShow && { pri: "now", label: "立即", text: `「${highlights.weakShow.show}」平均觀看 ${fmt(highlights.weakShow.avg)} 為最低，建議本週檢討縮圖/標題策略`, detail: `${highlights.weakShow.count} 集・低於頻道均值 ${fmt(highlights.avgViews || 0)}` },
+          abInsights.worstFrame && { pri: "now", label: "立即", text: `停止使用「${abInsights.worstFrame}」作為標題主框架（勝率 ${abInsights.worstFrameRate}%），改用「${abInsights.topFrame}」`, detail: "基於 AB test 數據" },
+          { pri: "month", label: "本月", text: "每集都做 A/B 縮圖測試，固定用「好奇懸念」框架，每次只測一個議題包裝變數", detail: "累積 5 次以上才有統計意義" },
+          highlights.strongShow && { pri: "month", label: "本月", text: `分析「${highlights.strongShow.show}」的成功模式（平均 ${fmt(highlights.strongShow.avg)}），嘗試複製到其他節目`, detail: `${highlights.strongShow.count} 集` },
+          guestInsight.top.length > 0 && { pri: "month", label: "本月", text: `優先再邀來賓：${guestInsight.top.map(g => g.name).join("、")}`, detail: "根據來賓觀看數排名" },
+          { pri: "long", label: "長期", text: "建立「選題 → 框架 → 包裝公式」的 SOP，讓每集選題時有數據依據", detail: "持續填寫 Google Sheet 選題類別欄位" },
+          { pri: "long", label: "長期", text: "觀眾高度重疊財經類頻道，可規劃「理財 × 防詐」跨節目聯合企劃", detail: "根據競品頻道分析" },
+        ].filter(Boolean).map((a, i) => (
+          <Card key={i} C={c} style={{ padding: "14px 18px", borderLeft: `3px solid ${priorityColors[a.pri]}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ background: priorityColors[a.pri] + "18", color: priorityColors[a.pri], fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 4, flexShrink: 0 }}>{a.label}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: c.text, fontSize: 13, lineHeight: 1.6 }}>{a.text}</div>
+                {a.detail && <div style={{ color: c.textDim, fontSize: 11, marginTop: 2 }}>{a.detail}</div>}
+              </div>
             </div>
-          ))}
-        </Card>
-      ))}
-    </div>
+          </Card>
+        ))}
+      </div>
+    </Section>
+
+    {/* ── Show-specific cards ── */}
+    <Section title="節目專屬建議" sub="根據各節目數據自動生成">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12 }}>
+        {showCards.map(sc => {
+          const color = (SHOW_COLORS(c))[sc.show] || c.accent;
+          return (
+            <Card key={sc.show} C={c} style={{ borderTop: `4px solid ${color}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ color, fontSize: 15, fontWeight: 700 }}>{sc.show}</span>
+                <span style={{ color: c.textDim, fontSize: 11 }}>{sc.count} 集・{sc.topAge} 歲{sc.fPct > 0 ? `・女 ${sc.fPct}%` : ""}</span>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, color, fontFamily: mono, marginBottom: 14 }}>{fmt(sc.avgViews)} <span style={{ fontSize: 11, fontWeight: 400, color: c.textDim }}>平均觀看</span></div>
+              {sc.strengths.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: c.green, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>強項</div>
+                  {sc.strengths.map((s, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 4 }}>
+                      <span style={{ color: c.green, fontSize: 8, marginTop: 4 }}>▲</span>
+                      <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.5 }}>{s}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div>
+                <div style={{ fontSize: 10, color: c.accent, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>行動</div>
+                {sc.actions.map((a, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 4 }}>
+                    <span style={{ color: c.accent, fontSize: 8, marginTop: 4 }}>→</span>
+                    <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.5 }}>{a}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </Section>
+
+    {/* ── AB Test Playbook (from Sheet) ── */}
+    {Object.keys(suggBlocks).length > 0 && (
+      <Section title="AB Test 策略手冊" sub="從 Google Sheet「AB建議」自動讀取">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12 }}>
+          {Object.entries(suggBlocks).slice(0, 4).map(([title, items]) => {
+            const bColor = title === "框架策略" ? c.accent : title === "議題包裝" ? c.teal : title === "下次測試方向" ? c.purple : c.blue;
+            return (
+              <Card key={title} C={c} style={{ borderTop: `3px solid ${bColor}` }}>
+                <div style={{ color: bColor, fontSize: 14, fontWeight: 600, marginBottom: 14 }}>{title}</div>
+                {items.map((item, j) => {
+                  const lines = item.split("\n");
+                  const headline = lines[0];
+                  const rest = lines.slice(1).join("\n").trim();
+                  return (
+                    <div key={j} style={{ marginBottom: 12 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                        <span style={{ color: bColor, fontSize: 8, marginTop: 5, flexShrink: 0 }}>●</span>
+                        <span style={{ color: c.text, fontSize: 12, lineHeight: 1.6, fontWeight: 500 }}>{headline}</span>
+                      </div>
+                      {rest && <div style={{ color: c.textDim, fontSize: 11, lineHeight: 1.6, marginLeft: 16, marginTop: 4, whiteSpace: "pre-wrap" }}>{rest}</div>}
+                    </div>
+                  );
+                })}
+              </Card>
+            );
+          })}
+        </div>
+      </Section>
+    )}
   </div>);
 }
 
@@ -1772,7 +1946,7 @@ export default function App() {
         {tab === 5 && <GuestTab fullVideos={filteredVideos} C={c} />}
         {tab === 6 && <RevenueTab fullVideos={filteredVideos} C={c} />}
         {tab === 7 && <TATopicTab fullVideos={filteredVideos} C={c} />}
-        {tab === 8 && <ActionTab C={c} />}
+        {tab === 8 && <ActionTab fullVideos={filteredVideos} abTests={abTests} abSuggestions={abSuggestions} C={c} />}
       </div>
     </div>
   );
