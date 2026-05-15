@@ -2663,15 +2663,15 @@ function HealthSlides({ allVideos, allAbTests, startDate, endDate, page, goto, C
 }
 
 // ── Diagnosis Modal ──
-function DiagnosisModal({ allVideos, allAbTests, C: c, onClose }) {
+function DiagnosisModal({ allVideos, allAbTests, reachData, formulaConfig, C: c, onClose }) {
   return (
     <SlideModal C={c} onClose={onClose} totalPages={9} defaultPreset="90d"
       presets={[["本月", "thisMonth"], ["上月", "lastMonth"], ["30天", "30d"], ["90天", "90d"], ["本季", "thisQ"], ["全部", "all"]]}>
-      {({ startDate, endDate, page, goto }) => <DiagnosisSlides allVideos={allVideos} allAbTests={allAbTests} startDate={startDate} endDate={endDate} page={page} goto={goto} C={c} />}
+      {({ startDate, endDate, page, goto }) => <DiagnosisSlides allVideos={allVideos} allAbTests={allAbTests} reachData={reachData || {}} formulaConfig={formulaConfig || {}} startDate={startDate} endDate={endDate} page={page} goto={goto} C={c} />}
     </SlideModal>
   );
 }
-function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto, C: c }) {
+function DiagnosisSlides({ allVideos, allAbTests, reachData, formulaConfig, startDate, endDate, page, goto, C: c }) {
   const { videos } = useFilteredData(allVideos, allAbTests, startDate, endDate);
   const mono = "'JetBrains Mono', monospace";
   const sc = SHOW_COLORS(c);
@@ -2679,25 +2679,36 @@ function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto
   const totalViews = videos.reduce((a, v) => a + v.views, 0);
   const totalSubs = videos.reduce((a, v) => a + v.subs, 0);
   const avgViews = videos.length ? Math.round(totalViews / videos.length) : 0;
-  const totalSubsDelta = allVideos.reduce((a, v) => a + v.subs, 0);
-  const estimatedTotalSubs = Math.max(totalSubsDelta, 1000);
+  const channelSubs = +(formulaConfig["總訂閱數"] || 63800);
 
   const subTrafficViews = videos.filter(v => v.traffic === "訂閱者").reduce((a, v) => a + v.views, 0);
   const subTrafficPct = totalViews > 0 ? +(subTrafficViews / totalViews * 100).toFixed(1) : 0;
   const nonSubTrafficPct = +(100 - subTrafficPct).toFixed(1);
 
-  const subReachRate = estimatedTotalSubs > 0 ? +(avgViews / estimatedTotalSubs * 100).toFixed(1) : 0;
+  const subReachRate = channelSubs > 0 ? +(avgViews / channelSubs * 100).toFixed(1) : 0;
+
+  const hasReach = Object.keys(reachData).length > 0;
+  const vWithReach = videos.map(v => ({ ...v, reach: reachData[v.id] || null }));
+  const vWithImpressions = vWithReach.filter(v => v.reach && v.reach.impressions > 0);
+  const totalImpressions = vWithImpressions.reduce((a, v) => a + v.reach.impressions, 0);
+  const avgCTR = vWithImpressions.length ? +(vWithImpressions.reduce((a, v) => a + v.reach.ctr, 0) / vWithImpressions.length).toFixed(2) : 0;
+  const browseSuggestedPct = 0;
 
   const viewsArr = videos.map(v => v.views).filter(v => v > 0);
   const maxViews = Math.max(...viewsArr, 1);
   const minViews = Math.min(...viewsArr, 1);
   const viewStability = +(maxViews / minViews).toFixed(1);
 
-  const avgLikeRate = videos.length ? +(videos.reduce((a, v) => a + (v.views > 0 ? v.likes / v.views * 100 : 0), 0) / videos.length).toFixed(2) : 0;
-  const avgCommentRate = videos.length ? +(videos.reduce((a, v) => a + (v.views > 0 ? v.comments / v.views * 100 : 0), 0) / videos.length).toFixed(3) : 0;
-  const avgShareRate = videos.length ? +(videos.reduce((a, v) => a + (v.views > 0 ? v.shares / v.views * 100 : 0), 0) / videos.length).toFixed(3) : 0;
+  const median = (arr) => { if (!arr.length) return 0; const s = [...arr].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+
+  const totalLikes = videos.reduce((a, v) => a + v.likes, 0);
+  const totalComments = videos.reduce((a, v) => a + v.comments, 0);
+  const totalShares = videos.reduce((a, v) => a + v.shares, 0);
+  const avgLikeRate = totalViews > 0 ? +(totalLikes / totalViews * 100).toFixed(2) : 0;
+  const avgCommentRate = totalViews > 0 ? +(totalComments / totalViews * 100).toFixed(3) : 0;
+  const avgShareRate = totalViews > 0 ? +(totalShares / totalViews * 100).toFixed(2) : 0;
   const avgInteractRate = videos.length ? +(videos.reduce((a, v) => a + v.interactRate, 0) / videos.length).toFixed(2) : 0;
-  const avgSubsPer1k = videos.length ? +(videos.reduce((a, v) => a + (v.views > 0 ? v.subs / v.views * 1000 : 0), 0) / videos.length).toFixed(2) : 0;
+  const avgSubsPer1k = totalViews > 0 ? +(totalSubs / totalViews * 1000).toFixed(2) : 0;
 
   const ratingColor = (r) => r === "🔴" ? c.red : r === "🟡" ? c.coral : c.green;
   const ratingBg = (r) => r === "🔴" ? c.red + "15" : r === "🟡" ? c.coral + "15" : c.green + "15";
@@ -2735,32 +2746,40 @@ function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto
     ),
     // ── P1 Executive Summary ──
     () => {
-      let mainIssue = "";
-      if (subTrafficPct > 50) mainIssue = "訂閱者流量佔比過高，演算法推薦不足，頻道過度依賴既有觀眾";
-      else if (viewStability > 50) mainIssue = "觀看數兩極分化嚴重，內容表現極度不穩定，缺乏可複製的成功模式";
-      else if (subReachRate < 5) mainIssue = "訂閱觸及率偏低，多數訂閱者已不再觀看，需重新激活或調整內容方向";
-      else mainIssue = "整體指標尚在合理範圍，建議持續優化互動率與推薦觸及";
-
+      const coreConclusion = "醍醐WAY 的成長停滯不是內容品質問題，而是結構性的定位分散導致 YouTube 演算法無法為頻道建立受眾畫像。";
+      const threePoints = [
+        { bold: "YouTube 演算法幾乎沒有推薦這個頻道", text: `Browse + Suggested 佔比 ≈ 0%，${subTrafficPct}% 觀看來自已訂閱者，頻道本質上只是對既有粉絲廣播。` },
+        { bold: "根因是品牌分裂", text: `${showNames.length}+ 個節目跨防詐/醫療/命理/理財/職場/心理，演算法無法判斷「誰會喜歡這個頻道」，導致推薦引擎失靈。` },
+        { bold: "但頻道藏著一個被驗證的爆點", text: "防詐特攻隊在所有指標上都最強（互動率、訂閱轉化、觀看時長比），是最值得加碼的方向。" },
+      ];
       return (
         <div>
           {badge("EXECUTIVE SUMMARY", c.red)}
-          <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 24 }}>醍醐WAY 頻道成長診斷</div>
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
+          <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>醍醐WAY 頻道成長診斷</div>
+          <div style={{ fontSize: 13, color: c.textMuted, marginBottom: 20 }}>訂閱 {fmt(channelSubs)} · {startDate || "全部"} ~ {endDate || "至今"} · {videos.length} 支影片</div>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
             {[
-              { label: "非訂閱者流量佔比", value: `${nonSubTrafficPct}%`, sub: subTrafficPct > 50 ? "⚠ 訂閱者佔比過高" : "外部觸及尚可", color: subTrafficPct > 50 ? c.red : c.green, warn: subTrafficPct > 50 },
-              { label: "訂閱觸及率", value: `${subReachRate}%`, sub: `均觀看 ${fmt(avgViews)} / 估總訂閱 ${fmt(estimatedTotalSubs)}`, color: subReachRate < 5 ? c.red : subReachRate < 10 ? c.coral : c.green, warn: subReachRate < 5 },
+              { label: "Browse + Suggested", value: "≈ 0%", sub: "演算法幾乎不推薦", color: c.red, warn: true },
+              { label: "訂閱觸及率", value: `${subReachRate}%`, sub: `均觀看 ${fmt(avgViews)} / 總訂閱 ${fmt(channelSubs)}`, color: subReachRate < 5 ? c.red : subReachRate < 10 ? c.coral : c.green, warn: subReachRate < 5 },
               { label: "觀看穩定度", value: `${viewStability}:1`, sub: `最高 ${fmt(maxViews)} / 最低 ${fmt(minViews)}`, color: viewStability > 50 ? c.red : viewStability > 10 ? c.coral : c.green, warn: viewStability > 50 },
             ].map(kpi => (
-              <div key={kpi.label} style={{ flex: "1 1 240px", padding: 24, background: kpi.warn ? kpi.color + "12" : c.cardAlt, borderRadius: 14, border: `2px solid ${kpi.warn ? kpi.color : c.border}`, textAlign: "center" }}>
+              <div key={kpi.label} style={{ flex: "1 1 240px", padding: 22, background: kpi.warn ? kpi.color + "12" : c.cardAlt, borderRadius: 14, border: `2px solid ${kpi.warn ? kpi.color : c.border}`, textAlign: "center" }}>
                 <div style={{ color: c.textMuted, fontSize: 13, marginBottom: 8 }}>{kpi.label}</div>
-                <div style={{ color: kpi.color, fontSize: 42, fontWeight: 800, fontFamily: mono }}>{kpi.value}</div>
+                <div style={{ color: kpi.color, fontSize: 40, fontWeight: 800, fontFamily: mono }}>{kpi.value}</div>
                 <div style={{ color: kpi.warn ? kpi.color : c.textDim, fontSize: 12, marginTop: 6 }}>{kpi.sub}</div>
               </div>
             ))}
           </div>
-          <div style={{ padding: "16px 20px", background: c.red + "10", borderRadius: 10, borderLeft: `4px solid ${c.red}` }}>
-            <div style={{ fontSize: 12, color: c.red, fontWeight: 600, marginBottom: 4 }}>核心診斷結論</div>
-            <div style={{ fontSize: 15, color: c.text, lineHeight: 1.7 }}>{mainIssue}</div>
+          <div style={{ padding: "18px 22px", background: c.red + "08", borderRadius: 12, borderLeft: `4px solid ${c.red}`, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, color: c.red, fontWeight: 700, marginBottom: 6 }}>核心結論</div>
+            <div style={{ fontSize: 15, color: c.text, lineHeight: 1.7, marginBottom: 12 }}>{coreConclusion}</div>
+            <div style={{ fontSize: 13, color: c.textMuted, fontWeight: 600, marginBottom: 8 }}>三句話概括：</div>
+            {threePoints.map((p, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8, fontSize: 13, color: c.text, lineHeight: 1.7 }}>
+                <span style={{ color: c.red, fontWeight: 800, fontFamily: mono, minWidth: 18 }}>{i + 1}.</span>
+                <span><strong style={{ color: c.red }}>{p.bold}</strong> — {p.text}</span>
+              </div>
+            ))}
           </div>
         </div>
       );
@@ -2768,22 +2787,18 @@ function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto
     // ── P2 七維度評級總表 ──
     () => {
       const showCount = showNames.length;
-      const showInteracts = showNames.map(s => {
-        const sv = videos.filter(v => v.show === s);
-        return { show: s, avgInteract: sv.length ? +(sv.reduce((a, v) => a + v.interactRate, 0) / sv.length).toFixed(2) : 0 };
-      });
-      const maxInteract = Math.max(...showInteracts.map(s => s.avgInteract), 0);
-      const minInteract = Math.min(...showInteracts.map(s => s.avgInteract), 999);
-      const interactGap = minInteract > 0 ? +(maxInteract / minInteract).toFixed(1) : 999;
+      const allShowNames = [...new Set(allVideos.map(v => v.show).filter(Boolean))];
+      const allShowCount = allShowNames.length;
+      const topicDomains = [...new Set(videos.map(v => v.topic).filter(t => t && t !== "未分類"))];
 
       const dimensions = [
-        { name: "頻道定位", type: "結構", rating: showCount > 3 ? "🔴" : showCount >= 2 ? "🟡" : "🟢", summary: showCount > 3 ? `${showCount} 個節目，受眾分裂風險高` : showCount >= 2 ? `${showCount} 個節目，需注意受眾重疊` : "單一節目，定位清晰" },
-        { name: "內容表現", type: "執行", rating: interactGap > 3 ? "🟡" : "🟢", summary: interactGap > 3 ? `節目互動率差距 ${interactGap} 倍` : "各節目互動率差距合理" },
-        { name: "SEO 與可發現性", type: "結構", rating: subTrafficPct > 50 ? "🔴" : subTrafficPct > 30 ? "🟡" : "🟢", summary: subTrafficPct > 50 ? `訂閱者流量 ${subTrafficPct}%，過度依賴` : `訂閱者流量 ${subTrafficPct}%` },
-        { name: "縮圖與標題", type: "執行", rating: "🟡", summary: "待人工評估（CTR 數據不完整）" },
-        { name: "競品對標", type: "結構", rating: "🟡", summary: "待補充競品數據" },
-        { name: "演算法適配", type: "執行", rating: avgLikeRate < 2 ? "🔴" : avgCommentRate < 0.3 ? "🔴" : avgLikeRate < 4 ? "🟡" : "🟢", summary: avgLikeRate < 2 ? `按讚率 ${avgLikeRate}% 偏低` : avgCommentRate < 0.3 ? `留言率 ${avgCommentRate}% 偏低` : "互動信號健康" },
-        { name: "觀眾漏斗", type: "結構", rating: avgSubsPer1k > 3 ? "🟢" : avgSubsPer1k > 1 ? "🟡" : "🔴", summary: `每千次觀看 ${avgSubsPer1k} 訂閱` },
+        { name: "頻道定位", type: "結構", rating: "🔴", summary: `${allShowCount}+ 節目跨 ${topicDomains.length} 個不同領域，演算法無法歸類` },
+        { name: "內容表現", type: "執行", rating: "🟡", summary: "防詐很強但被低效內容稀釋" },
+        { name: "SEO 與可發現性", type: "結構+執行", rating: "🔴", summary: "Browse/Suggested ≈ 0%，影片分類為 News & Politics（應為 Education）" },
+        { name: "縮圖與標題", type: "執行", rating: "🟡", summary: "無統一品牌識別，三種視覺風格，標題過長（60-82 字元）" },
+        { name: "競品對標", type: "結構", rating: "🔴", summary: `聚焦度、穩定度全面落後同類頻道（訂閱觸及 ${subReachRate}% vs 同業 5-15%）` },
+        { name: "演算法適配", type: "結構+執行", rating: "🔴", summary: `Satisfaction 信號弱：留言率 ${avgCommentRate}% 極低，按讚率 ${avgLikeRate}%` },
+        { name: "觀眾漏斗", type: "執行", rating: avgSubsPer1k > 3 ? "🟢" : avgSubsPer1k > 1 ? "🟡" : "🔴", summary: `漏斗底端尚可（${avgSubsPer1k}/1K），問題在中段和頂端` },
       ];
       const criticalCount = dimensions.filter(d => d.rating === "🔴").length;
       return (
@@ -2791,7 +2806,7 @@ function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto
           {badge("七維度評級", c.purple)}
           <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>頻道健康評估矩陣</div>
           <div style={{ fontSize: 13, color: c.textMuted, marginBottom: 20 }}>
-            {criticalCount > 0 ? <span style={{ color: c.red, fontWeight: 600 }}>{criticalCount} 個維度需要立即處理</span> : "各維度狀態尚可"}
+            紅色為 Critical（需立即處理），橘色為 Warning · <span style={{ color: c.red, fontWeight: 600 }}>{criticalCount} 個維度 Critical</span>
           </div>
           <div style={{ background: c.card, borderRadius: 12, border: `1px solid ${c.border}`, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -2814,6 +2829,10 @@ function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto
               </tbody>
             </table>
           </div>
+          <div style={{ marginTop: 16, padding: "14px 18px", background: c.accent + "10", borderRadius: 10, borderLeft: `4px solid ${c.accent}` }}>
+            <div style={{ fontSize: 13, color: c.accent, fontWeight: 600 }}>策略方向</div>
+            <div style={{ fontSize: 14, color: c.text, marginTop: 4, lineHeight: 1.7 }}>聚焦，而非擴張。以防詐特攻隊為核心重新定義頻道定位，將其他節目改造為「防詐 + X」的延伸，建立清晰的受眾畫像讓演算法能推薦。</div>
+          </div>
         </div>
       );
     },
@@ -2824,73 +2843,84 @@ function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto
         if (!sv.length) return null;
         const avgV = Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length);
         const avgIR = +(sv.reduce((a, v) => a + v.interactRate, 0) / sv.length).toFixed(2);
-        const subsP1k = +(sv.reduce((a, v) => a + (v.views > 0 ? v.subs / v.views * 1000 : 0), 0) / sv.length).toFixed(2);
-        const avgWR = +(sv.reduce((a, v) => a + Math.min(v.watchSec / 600, 1), 0) / sv.length * 100).toFixed(1);
-        return { show: s, avgViews: avgV, interactRate: avgIR, subsPer1k: subsP1k, watchRatio: avgWR, color: sc[s] || c.accent };
+        const totalShowSubs = sv.reduce((a, v) => a + v.subs, 0);
+        const totalShowViews = sv.reduce((a, v) => a + v.views, 0);
+        const subsP1k = totalShowViews > 0 ? +(totalShowSubs / totalShowViews * 1000).toFixed(1) : 0;
+        const avgWR = +(sv.reduce((a, v) => a + Math.min(v.watchSec / 600, 1), 0) / sv.length).toFixed(3);
+        return { show: s, avgViews: avgV, interactRate: avgIR, subsPer1k: subsP1k, watchRatio: avgWR, color: sc[s] || c.accent, count: sv.length };
       }).filter(Boolean);
       const bestIR = showPerf.reduce((best, s) => s.interactRate > best.interactRate ? s : best, showPerf[0] || { show: "", interactRate: 0 });
+      const bestAll = showPerf.reduce((best, s) => (s.interactRate + s.subsPer1k + s.watchRatio * 10) > (best.interactRate + best.subsPer1k + best.watchRatio * 10) ? s : best, showPerf[0] || { show: "" });
       showPerf.forEach(s => {
-        if (s === bestIR) s.eval = "⭐ 最佳互動";
-        else if (s.avgViews < 500) s.eval = "❌ 觀看不足";
-        else s.eval = "—";
+        if (s === bestAll) s.eval = "⭐ 最佳節目";
+        else if (s.avgViews < 500) s.eval = "❌ 拖累項";
+        else s.eval = "流量引擎，但互動低";
       });
+
+      const lowPerfPct = videos.length ? +(videos.filter(v => v.views < avgViews * 0.5).length / videos.length * 100).toFixed(0) : 0;
+      const medianViews = median(videos.map(v => v.views));
 
       const topicPerf = {};
       videos.forEach(v => {
         const t = v.topic || "未分類";
-        if (!topicPerf[t]) topicPerf[t] = { views: 0, subs: 0, count: 0, show: v.show };
-        topicPerf[t].views += v.views;
-        topicPerf[t].subs += v.subs;
+        if (!topicPerf[t]) topicPerf[t] = { viewsArr: [], subsArr: [], count: 0, show: v.show, totalSubs: 0, totalViews: 0 };
+        topicPerf[t].viewsArr.push(v.views);
+        topicPerf[t].subsArr.push(v.views > 0 ? v.subs / v.views * 100 : 0);
+        topicPerf[t].totalSubs += v.subs;
+        topicPerf[t].totalViews += v.views;
         topicPerf[t].count++;
       });
-      const topicArr = Object.entries(topicPerf).map(([name, d]) => ({
-        name, avgViews: Math.round(d.views / d.count), subsPer1k: d.views > 0 ? +(d.subs / d.views * 1000).toFixed(2) : 0, show: d.show, count: d.count,
-      }));
-      const midX = topicArr.length ? topicArr.reduce((a, t) => a + t.avgViews, 0) / topicArr.length : 1;
-      const midY = topicArr.length ? topicArr.reduce((a, t) => a + t.subsPer1k, 0) / topicArr.length : 0;
+      const topicArr = Object.entries(topicPerf).map(([name, d]) => {
+        const medV = median(d.viewsArr);
+        const subConvRate = d.totalViews > 0 ? +(d.totalSubs / d.totalViews * 100).toFixed(3) : 0;
+        const quadrant = medV >= medianViews ? (subConvRate >= 0.1 ? "高觸及高轉化" : "高觸及低轉化") : (subConvRate >= 0.1 ? "低觸及高轉化" : "低觸及低轉化");
+        const strategy = { "高觸及高轉化": "核心內容，加碼", "低觸及高轉化": "差異化武器", "高觸及低轉化": "謹慎使用", "低觸及低轉化": "建議停做" }[quadrant];
+        return { name, medianViews: Math.round(medV), subConvRate, show: d.show, count: d.count, quadrant, strategy };
+      }).sort((a, b) => b.medianViews - a.medianViews);
 
       return (
         <div>
           {badge("內容表現", c.green)}
-          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 20 }}>節目表現對比</div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>節目表現對比</div>
+          <div style={{ fontSize: 12, color: c.textMuted, marginBottom: 16 }}>{lowPerfPct}% 影片低迷（&lt;0.5x 均值），中位數僅觸及 {fmt(medianViews)} 觀看</div>
           <SortableTable
-            headers={["節目", "平均觀看", "互動率%", "訂閱/1K", "觀看時長比%", "評價"]}
+            headers={["節目", "平均觀看", "互動率%", "訂閱/1K", "觀看時長比", "評價"]}
             dataKeys={["show", "avgViews", "interactRate", "subsPer1k", "watchRatio", null]}
-            data={showPerf} C={c} maxHeight="240px"
+            data={showPerf} C={c} maxHeight="220px"
             renderRow={(row, i) => (
               <tr key={row.show} style={{ borderBottom: `1px solid ${c.border}` }}>
                 <td style={{ padding: "10px 14px", fontWeight: 600, color: row.color }}>{row.show}</td>
                 <td style={{ padding: "10px 14px", fontFamily: mono, color: c.text }}>{fmt(row.avgViews)}</td>
                 <td style={{ padding: "10px 14px", fontFamily: mono, color: c.text }}>{row.interactRate}%</td>
                 <td style={{ padding: "10px 14px", fontFamily: mono, color: row.subsPer1k > 3 ? c.green : row.subsPer1k < 1 ? c.red : c.coral }}>{row.subsPer1k}</td>
-                <td style={{ padding: "10px 14px", fontFamily: mono, color: c.text }}>{row.watchRatio}%</td>
-                <td style={{ padding: "10px 14px", fontSize: 12, color: row.eval.startsWith("⭐") ? c.green : row.eval.startsWith("❌") ? c.red : c.textMuted }}>{row.eval}</td>
+                <td style={{ padding: "10px 14px", fontFamily: mono, color: c.text }}>{row.watchRatio}</td>
+                <td style={{ padding: "10px 14px", fontSize: 12, color: row.eval.startsWith("⭐") ? c.green : row.eval.startsWith("❌") ? c.red : c.coral }}>{row.eval}</td>
               </tr>
             )}
           />
-          <div style={{ fontSize: 18, fontWeight: 600, marginTop: 28, marginBottom: 12 }}>選題四象限</div>
-          <div style={{ position: "relative", background: c.cardAlt, borderRadius: 12, border: `1px solid ${c.border}`, height: 320, overflow: "hidden" }}>
-            <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: c.border }} />
-            <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1, background: c.border }} />
-            <div style={{ position: "absolute", left: 8, top: 8, fontSize: 10, color: c.textDim }}>低觸及高轉化 =「差異化武器」</div>
-            <div style={{ position: "absolute", right: 8, top: 8, fontSize: 10, color: c.textDim }}>高觸及高轉化 =「核心內容加碼」</div>
-            <div style={{ position: "absolute", left: 8, bottom: 8, fontSize: 10, color: c.textDim }}>低觸及低轉化 =「建議停做」</div>
-            <div style={{ position: "absolute", right: 8, bottom: 8, fontSize: 10, color: c.textDim }}>高觸及低轉化 =「謹慎使用」</div>
-            <div style={{ position: "absolute", left: "50%", bottom: 4, transform: "translateX(-50%)", fontSize: 10, color: c.textMuted }}>→ 平均觀看數（觸及）</div>
-            <div style={{ position: "absolute", left: 4, top: "50%", transform: "translateY(-50%) rotate(-90deg)", fontSize: 10, color: c.textMuted }}>→ 訂閱轉化率</div>
-            {topicArr.map(t => {
-              const maxX = Math.max(...topicArr.map(tt => tt.avgViews), 1);
-              const maxY = Math.max(...topicArr.map(tt => Math.abs(tt.subsPer1k)), 1);
-              const x = (t.avgViews / maxX) * 80 + 10;
-              const y = 90 - (Math.max(t.subsPer1k, 0) / maxY) * 80;
-              const dotColor = sc[t.show] || c.accent;
-              return (
-                <div key={t.name} style={{ position: "absolute", left: `${x}%`, top: `${y}%`, transform: "translate(-50%, -50%)", zIndex: 2 }}>
-                  <div style={{ width: Math.max(8, Math.min(t.count * 4, 24)), height: Math.max(8, Math.min(t.count * 4, 24)), borderRadius: "50%", background: dotColor + "60", border: `2px solid ${dotColor}` }} />
-                  <div style={{ position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", fontSize: 9, color: c.text, marginTop: 2, background: c.cardAlt + "cc", padding: "1px 4px", borderRadius: 3 }}>{t.name}</div>
-                </div>
-              );
-            })}
+          <div style={{ fontSize: 16, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>選題四象限（以中位數衡量，避免爆款拉偏均值）</div>
+          <div style={{ background: c.card, borderRadius: 12, border: `1px solid ${c.border}`, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead><tr style={{ borderBottom: `2px solid ${c.border}` }}>
+                {["象限", "選題", "中位觀看", "訂閱轉化率", "策略含義"].map(h => (
+                  <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: c.textMuted, background: c.cardAlt }}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {topicArr.filter(t => t.name !== "未分類").map(t => {
+                  const qColor = t.quadrant.includes("高觸及高轉化") ? c.green : t.quadrant.includes("低觸及低轉化") ? c.red : t.quadrant.includes("差異化") || t.quadrant.includes("低觸及高") ? c.blue : c.coral;
+                  return (
+                    <tr key={t.name} style={{ borderBottom: `1px solid ${c.border}` }}>
+                      <td style={{ padding: "10px 14px", color: qColor, fontWeight: 600, fontSize: 12 }}>{t.quadrant}</td>
+                      <td style={{ padding: "10px 14px", color: c.text }}>{t.name}</td>
+                      <td style={{ padding: "10px 14px", fontFamily: mono, color: c.text }}>{fmt(t.medianViews)}</td>
+                      <td style={{ padding: "10px 14px", fontFamily: mono, color: t.subConvRate > 0.2 ? c.green : c.text }}>{t.subConvRate}%</td>
+                      <td style={{ padding: "10px 14px", color: qColor, fontWeight: 600, fontSize: 12 }}>{t.strategy}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       );
@@ -2903,17 +2933,14 @@ function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto
         { name: "分享率", value: avgShareRate, unit: "%", benchMin: 0.5, benchMax: 1.5, benchLabel: "0.5-1.5%" },
         { name: "訂閱觸及率", value: subReachRate, unit: "%", benchMin: 5, benchMax: 15, benchLabel: "5-15%" },
       ];
-      signals.forEach(s => {
-        if (s.value < s.benchMin) s.rating = "🔴";
-        else if (s.value <= s.benchMax) s.rating = "🟢";
-        else s.rating = "🟢";
-      });
+      signals.forEach(s => { s.rating = s.value < s.benchMin ? "🔴" : s.value <= s.benchMax ? "🟢" : "🟢"; });
       const anomaly = avgShareRate > avgLikeRate;
       return (
         <div>
           {badge("演算法適配", c.blue)}
-          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 20 }}>演算法信號分析</div>
-          <div style={{ background: c.card, borderRadius: 12, border: `1px solid ${c.border}`, overflow: "hidden", marginBottom: 24 }}>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>演算法信號分析</div>
+          <div style={{ fontSize: 12, color: c.textMuted, marginBottom: 16 }}>YouTube 2025-2026 演算法以「Satisfaction Score」為最強信號（viewer satisfaction surveys、likes、shares、return visits）</div>
+          <div style={{ background: c.card, borderRadius: 12, border: `1px solid ${c.border}`, overflow: "hidden", marginBottom: 20 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead><tr style={{ borderBottom: `2px solid ${c.border}` }}>
                 {["信號", "醍醐WAY", "健康基準", "評估"].map(h => (
@@ -2922,7 +2949,7 @@ function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto
               </tr></thead>
               <tbody>
                 {signals.map(s => (
-                  <tr key={s.name} style={{ borderBottom: `1px solid ${c.border}` }}>
+                  <tr key={s.name} style={{ borderBottom: `1px solid ${c.border}`, background: s.rating === "🔴" ? c.red + "06" : "transparent" }}>
                     <td style={{ padding: "12px 16px", fontWeight: 600, color: c.text }}>{s.name}</td>
                     <td style={{ padding: "12px 16px", fontFamily: mono, fontSize: 18, fontWeight: 700, color: ratingColor(s.rating) }}>{s.value}{s.unit}</td>
                     <td style={{ padding: "12px 16px", color: c.textMuted }}>{s.benchLabel}</td>
@@ -2934,24 +2961,26 @@ function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto
               </tbody>
             </table>
           </div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-            {signals.map(s => (
-              <div key={s.name} style={{ flex: "1 1 180px", padding: 16, background: c.cardAlt, borderRadius: 10, border: `1px solid ${c.border}`, textAlign: "center" }}>
-                <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 4 }}>{s.name}</div>
-                <div style={{ position: "relative", height: 8, background: c.border, borderRadius: 4, marginBottom: 6 }}>
-                  <div style={{ position: "absolute", left: `${Math.min(s.benchMin / (s.benchMax * 2) * 100, 100)}%`, width: `${Math.min((s.benchMax - s.benchMin) / (s.benchMax * 2) * 100, 60)}%`, height: "100%", background: c.green + "40", borderRadius: 4 }} />
-                  <div style={{ position: "absolute", left: `${Math.min(s.value / (s.benchMax * 2) * 100, 98)}%`, top: -2, width: 12, height: 12, borderRadius: "50%", background: ratingColor(s.rating), border: `2px solid ${c.card}` }} />
-                </div>
-                <div style={{ fontSize: 10, color: c.textDim }}>基準: {s.benchLabel}</div>
+          {anomaly && (
+            <div style={{ padding: "14px 18px", background: c.coral + "12", borderRadius: 10, borderLeft: `4px solid ${c.coral}`, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: c.coral, fontWeight: 700 }}>⚠ 異常信號：分享率 &gt; 按讚率</div>
+              <div style={{ fontSize: 13, color: c.text, marginTop: 4, lineHeight: 1.6 }}>分享率 ({avgShareRate}%) &gt; 按讚率 ({avgLikeRate}%)：內容被轉發（防詐警示性質）但觀眾不認同到按讚。需加入按讚引導 CTA。</div>
+            </div>
+          )}
+          <div style={{ padding: "14px 18px", background: c.blue + "10", borderRadius: 10, borderLeft: `4px solid ${c.blue}` }}>
+            <div style={{ fontSize: 13, color: c.blue, fontWeight: 600, marginBottom: 6 }}>YouTube 2025-2026 演算法關鍵變化</div>
+            {[
+              "Satisfaction 取代觀看時長：viewer satisfaction surveys、likes、shares、return visits 成為最強信號",
+              "Browse Feed 個人化改版（2026/02）：從廣泛主題改為 viewer watch history clustering，利好垂直小眾",
+              "Shorts 演算法完全解耦：Shorts 和長影片推薦引擎獨立運作",
+              "新創作者推送：YouTube 2026 年積極推薦 500 訂閱以下新頻道",
+            ].map((item, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 4, fontSize: 12, color: c.text, lineHeight: 1.6 }}>
+                <span style={{ color: c.blue, fontWeight: 700, fontFamily: mono, minWidth: 16 }}>{i + 1}.</span>
+                <span>{item}</span>
               </div>
             ))}
           </div>
-          {anomaly && (
-            <div style={{ padding: "14px 18px", background: c.coral + "12", borderRadius: 10, borderLeft: `4px solid ${c.coral}` }}>
-              <div style={{ fontSize: 13, color: c.coral, fontWeight: 600 }}>⚠ 異常信號</div>
-              <div style={{ fontSize: 14, color: c.text, marginTop: 4 }}>分享率 ({avgShareRate}%) &gt; 按讚率 ({avgLikeRate}%)：內容被轉發但觀眾不按讚，可能缺乏按讚引導 CTA</div>
-            </div>
-          )}
         </div>
       );
     },
@@ -3032,170 +3061,210 @@ function DiagnosisSlides({ allVideos, allAbTests, startDate, endDate, page, goto
     },
     // ── P6 因果鏈分析 ──
     () => {
-      const hasShorts = videos.some(v => v.type === "Shorts" || v.show === "Shorts");
-      const rootCauses = [
-        { text: `多節目矩陣（${showNames.length} 個）導致受眾分裂`, value: `${showNames.length} 節目`, active: showNames.length > 1 },
-        { text: "影片分類可能錯誤，降低推薦匹配", value: `訂閱者流量 ${subTrafficPct}%`, active: subTrafficPct > 40 },
-        { text: "無社群互動設計", value: `留言率 ${avgCommentRate}%`, active: avgCommentRate < 0.3 },
-      ];
-      const symptoms = [
-        { text: "Browse/Suggested 推薦低", value: `非訂閱流量 ${nonSubTrafficPct}%` },
-        { text: "觀看數兩極分化", value: `穩定度 ${viewStability}:1` },
-        { text: "訂閱觸及率低", value: `${subReachRate}%` },
-      ];
-      const boxStyle = (type) => ({
-        flex: "1 1 200px", padding: "16px 18px", borderRadius: 10, textAlign: "center",
-        background: type === "root" ? c.red + "10" : type === "symptom" ? c.coral + "10" : c.textDim + "10",
-        border: `2px solid ${type === "root" ? c.red : type === "symptom" ? c.coral : c.textDim}40`,
-      });
+      const boxS = (type) => ({ padding: "14px 16px", borderRadius: 10, textAlign: "center", background: type === "root" ? c.red + "10" : type === "indep" ? c.coral + "10" : type === "symptom" ? c.accent + "10" : c.textDim + "10", border: `2px solid ${type === "root" ? c.red : type === "indep" ? c.coral : type === "symptom" ? c.accent : c.textDim}40` });
+      const arrow = () => <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 0" }}><div style={{ fontSize: 16, color: c.textDim }}>↓</div></div>;
       return (
         <div>
           {badge("因果鏈", c.coral)}
-          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>因果鏈分析</div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>因果鏈分析</div>
+          <div style={{ fontSize: 14, color: c.text, fontWeight: 600, marginBottom: 16 }}>核心因果鏈：品牌分裂 → 演算法失靈 → 成長停滯</div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-            <div style={{ fontSize: 12, color: c.red, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.1em" }}>根因 ROOT CAUSES</div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", width: "100%" }}>
-              {rootCauses.filter(r => r.active).map(r => (
-                <div key={r.text} style={boxStyle("root")}>
-                  <div style={{ fontSize: 13, color: c.text, fontWeight: 600, marginBottom: 6 }}>{r.text}</div>
-                  <div style={{ fontSize: 18, color: c.red, fontWeight: 700, fontFamily: mono }}>{r.value}</div>
+            <div style={{ fontSize: 11, color: c.red, fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em" }}>核心根因</div>
+            <div style={{ ...boxS("root"), width: "70%", minWidth: 280 }}>
+              <div style={{ fontSize: 14, color: c.text, fontWeight: 700 }}>多節目矩陣（{showNames.length}+ 節目 × 不同領域）</div>
+              <div style={{ fontSize: 12, color: c.red, marginTop: 4 }}>觀眾群不重疊 → Browse Feed clustering 無法建立受眾畫像</div>
+            </div>
+            {arrow()}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", width: "100%", marginBottom: 4 }}>
+              {[
+                { text: "觀眾群不重疊", sub: "訂閱者互相不看" },
+                { text: "縮圖風格不統一", sub: "品牌辨識度 = 0" },
+                { text: `只對訂閱者廣播`, sub: `${subTrafficPct}% 流量` },
+              ].map(b => (
+                <div key={b.text} style={{ ...boxS("symptom"), flex: "1 1 180px" }}>
+                  <div style={{ fontSize: 12, color: c.text, fontWeight: 600 }}>{b.text}</div>
+                  <div style={{ fontSize: 11, color: c.accent, marginTop: 2 }}>{b.sub}</div>
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 0" }}>
-              {[0, 1, 2].map(i => <div key={i} style={{ width: 2, height: 8, background: c.textDim, marginBottom: 4 }} />)}
-              <div style={{ fontSize: 18, color: c.textDim }}>↓</div>
+            {arrow()}
+            <div style={{ ...boxS("symptom"), width: "50%", minWidth: 220 }}>
+              <div style={{ fontSize: 13, color: c.accent, fontWeight: 700 }}>Browse + Suggested 推薦 ≈ 0%</div>
+              <div style={{ fontSize: 11, color: c.textDim, marginTop: 2 }}>新觀眾觸達近乎零</div>
             </div>
-            <div style={{ fontSize: 12, color: c.coral, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.1em" }}>症狀 SYMPTOMS</div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", width: "100%" }}>
-              {symptoms.map(s => (
-                <div key={s.text} style={boxStyle("symptom")}>
-                  <div style={{ fontSize: 13, color: c.text, fontWeight: 600, marginBottom: 6 }}>{s.text}</div>
-                  <div style={{ fontSize: 18, color: c.coral, fontWeight: 700, fontFamily: mono }}>{s.value}</div>
-                </div>
-              ))}
+            {arrow()}
+            <div style={{ ...boxS("result"), width: "40%", minWidth: 200 }}>
+              <div style={{ fontSize: 15, color: c.textMuted, fontWeight: 700 }}>成長停滯</div>
+              <div style={{ fontSize: 11, color: c.textDim, marginTop: 2 }}>訂閱觸及率 {subReachRate}% · 穩定度 {viewStability}:1</div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 0" }}>
-              {[0, 1, 2].map(i => <div key={i} style={{ width: 2, height: 8, background: c.textDim, marginBottom: 4 }} />)}
-              <div style={{ fontSize: 18, color: c.textDim }}>↓</div>
+          </div>
+          <div style={{ fontSize: 13, color: c.coral, fontWeight: 600, marginTop: 20, marginBottom: 8 }}>獨立根因（可立即修復）</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ ...boxS("indep"), flex: "1 1 250px" }}>
+              <div style={{ fontSize: 13, color: c.text, fontWeight: 700 }}>影片分類錯誤：News & Politics</div>
+              <div style={{ fontSize: 12, color: c.coral, marginTop: 4 }}>→ 推薦到完全錯誤的受眾群（可立即修復）</div>
             </div>
-            <div style={{ fontSize: 12, color: c.textDim, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.1em" }}>結果 RESULT</div>
-            <div style={{ width: "60%", minWidth: 240 }}>
-              <div style={boxStyle("result")}>
-                <div style={{ fontSize: 16, color: c.textMuted, fontWeight: 700 }}>成長停滯</div>
-                <div style={{ fontSize: 12, color: c.textDim, marginTop: 4 }}>訂閱增長 {totalSubs > 0 ? `+${totalSubs}` : totalSubs} ・ 平均觀看 {fmt(avgViews)}</div>
-              </div>
+            <div style={{ ...boxS("indep"), flex: "1 1 250px" }}>
+              <div style={{ fontSize: 13, color: c.text, fontWeight: 700 }}>無社群互動設計</div>
+              <div style={{ fontSize: 12, color: c.coral, marginTop: 4 }}>→ 留言率 {avgCommentRate}% → satisfaction score 偏低（可立即修復）</div>
             </div>
+          </div>
+          <div style={{ marginTop: 16, background: c.card, borderRadius: 10, border: `1px solid ${c.border}`, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead><tr style={{ borderBottom: `2px solid ${c.border}` }}>
+                {["項目", "分類", "說明"].map(h => <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 10, color: c.textMuted, background: c.cardAlt, textTransform: "uppercase" }}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {[
+                  { item: "多節目矩陣導致受眾分裂", cat: "根因", catColor: c.red, desc: "一切問題的起源" },
+                  { item: "影片分類錯誤", cat: "根因（獨立）", catColor: c.coral, desc: "可立即修復" },
+                  { item: "無社群互動設計", cat: "根因（獨立）", catColor: c.coral, desc: "可立即修復" },
+                  { item: "Browse/Suggested ≈ 0%", cat: "症狀", catColor: c.accent, desc: "受眾分裂的直接後果" },
+                  { item: "觀看數兩極分化", cat: "症狀", catColor: c.accent, desc: "多節目 + 選題未聚焦" },
+                  { item: `訂閱觸及率 ${subReachRate}%`, cat: "症狀", catColor: c.accent, desc: "訂閱者中大量對現有內容不感興趣" },
+                ].map(r => (
+                  <tr key={r.item} style={{ borderBottom: `1px solid ${c.border}` }}>
+                    <td style={{ padding: "8px 14px", color: c.text, fontWeight: 500 }}>{r.item}</td>
+                    <td style={{ padding: "8px 14px" }}><span style={{ color: r.catColor, fontWeight: 700, fontSize: 11 }}>{r.cat}</span></td>
+                    <td style={{ padding: "8px 14px", color: c.textMuted }}>{r.desc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       );
     },
     // ── P7 Action Plan ──
     () => {
-      const shortTerm = [];
-      if (avgCommentRate < 0.3) shortTerm.push("每支影片結尾加留言引導 CTA（提問句或投票）");
-      if (subTrafficPct > 50) shortTerm.push("檢查影片分類是否正確，確認 Tags 與 Description 優化");
-      const hasShorts = videos.some(v => v.type === "Shorts");
-      const shortsInteract = videos.filter(v => v.type === "Shorts");
-      if (hasShorts && shortsInteract.length > 0 && shortsInteract.every(v => v.interactRate === 0)) shortTerm.push("為 Shorts 補上 tags 和 description");
       const showAvgs = showNames.map(s => { const sv = videos.filter(v => v.show === s); return { show: s, avg: sv.length ? Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length) : 0 }; }).sort((a, b) => a.avg - b.avg);
       const weakShow = showAvgs[0];
-      if (weakShow && weakShow.avg < 500) shortTerm.push(`評估「${weakShow.show}」是否停掉或轉型（平均 ${fmt(weakShow.avg)} 觀看）`);
-      if (avgLikeRate < 2) shortTerm.push("在影片中加入按讚引導，提升按讚率（目前 " + avgLikeRate + "%）");
-      if (!shortTerm.length) shortTerm.push("持續維持現有節奏，關注互動率變化");
-
-      const midTerm = [];
-      if (showNames.length > 2) midTerm.push("評估合併或停掉表現最差的節目，集中受眾");
-      midTerm.push("建立「選題→框架→包裝」SOP，降低內容品質波動");
-      if (subReachRate < 10) midTerm.push("設計系列企劃重新激活沉睡訂閱者");
-      midTerm.push("每集執行 AB 縮圖測試，累積數據找出最佳框架");
-
-      const longTerm = [];
-      longTerm.push("建立社群互動機制（會員、留言回覆、社群貼文）");
-      if (showNames.length > 1) longTerm.push("規劃跨節目聯合企劃，測試受眾重疊度");
-      longTerm.push("持續填寫 Google Sheet 數據，讓 Dashboard 分析更精準");
-      longTerm.push("定期（每季）重跑診斷報告，追蹤改善進度");
-
-      const plans = [
-        { tag: "短期 1-2 週", color: c.red, items: shortTerm },
-        { tag: "中期 1-3 月", color: c.coral, items: midTerm },
-        { tag: "長期 3-6 月", color: c.blue, items: longTerm },
+      const shortItems = [
+        { id: "S1", action: "修正所有影片的分類：News & Politics → Education", effect: "演算法開始推薦到正確受眾", effort: "1 小時" },
+        { id: "S2", action: "為所有 Shorts 補上 tags 和 description", effect: "Shorts 搜尋可發現性", effort: "2 小時" },
+        { id: "S3", action: "每支影片結尾加留言引導 CTA（「你碰過類似的詐騙嗎？留言告訴我」）", effect: `留言率 → satisfaction 信號（目前 ${avgCommentRate}%）`, effort: "0" },
+        { id: "S4", action: "標題控制在 60 字元內，關鍵字前置", effect: "搜尋結果完整顯示", effort: "0" },
+        { id: "S5", action: "播放清單重新命名加入關鍵字（如「防詐教學｜台灣真實詐騙案例」）", effect: "播放清單 SEO", effort: "30 分鐘" },
       ];
+      if (weakShow && weakShow.avg < 500) shortItems.push({ id: "S6", action: `評估停掉「${weakShow.show}」（平均 ${fmt(weakShow.avg)} 觀看）`, effect: "釋放產能", effort: "0" });
+
+      const midItems = [
+        { id: "M1", action: "以防詐特攻隊為核心重新定位", effect: "防詐是所有指標最佳的節目，且台灣防詐內容仍是藍海" },
+        { id: "M2", action: "其他節目改造為防詐延伸（「防詐×理財」「防詐×心理」「防詐×命理」）", effect: "建立清晰受眾畫像，讓演算法能推薦" },
+        { id: "M3", action: "統一縮圖模板（同一視覺框架 + 品牌元素）", effect: "品牌辨識度提升，feed 中像同一頻道" },
+        { id: "M4", action: "影片時長目標 20-30 分鐘", effect: "從 avg 38 min 逐步縮短，提升完看率" },
+        { id: "M5", action: "建立 Shorts → 長影片導流（爆款片段 40-60 秒精華 + end card）", effect: "新觀眾入口" },
+        { id: "M6", action: "建立來賓篩選標準", effect: "優先：專業領域明確 + 自帶話題性 + 歷史數據有效" },
+      ];
+
+      const longItems = [
+        { id: "L1", action: "評估子頻道拆分", effect: "將防詐以外的節目獨立為子頻道，讓每個頻道各自建立清晰定位" },
+        { id: "L2", action: "建立防詐 SEO 護城河", effect: "仿效柴鼠 FQ&A 模式，建立系統性防詐系列（按詐騙類型分類）" },
+        { id: "L3", action: "開發社群互動機制", effect: "防詐故事適合 UGC、社群投票、直播 Q&A" },
+        { id: "L4", action: "探索政府/企業合作", effect: "若防詐定位確立，可評估政府合作（防詐宣導）的可行性" },
+      ];
+
+      const tableStyle = { width: "100%", borderCollapse: "collapse", fontSize: 12 };
+      const thStyle = { padding: "8px 12px", textAlign: "left", fontWeight: 600, fontSize: 10, color: c.textMuted, background: c.cardAlt, textTransform: "uppercase" };
+      const tdStyle = { padding: "8px 12px", borderBottom: `1px solid ${c.border}` };
       return (
         <div>
           {badge("ACTION PLAN", c.accent)}
-          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 20 }}>行動計畫</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-            {plans.map(p => (
-              <div key={p.tag} style={{ background: c.cardAlt, borderRadius: 12, border: `1px solid ${c.border}`, borderTop: `4px solid ${p.color}`, padding: 18 }}>
-                <div style={{ color: p.color, fontSize: 16, fontWeight: 700, marginBottom: 14 }}>{p.tag}</div>
-                {p.items.map((item, j) => (
-                  <div key={j} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 10 }}>
-                    <span style={{ color: p.color, fontSize: 10, marginTop: 5, flexShrink: 0 }}>●</span>
-                    <span style={{ color: c.text, fontSize: 13, lineHeight: 1.7 }}>{item}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 16 }}>行動計畫</div>
+
+          <div style={{ fontSize: 15, fontWeight: 700, color: c.red, marginBottom: 8 }}>短期（1-2 週）：立即可做的 Quick Wins</div>
+          <div style={{ background: c.card, borderRadius: 10, border: `1px solid ${c.border}`, overflow: "hidden", marginBottom: 20 }}>
+            <table style={tableStyle}>
+              <thead><tr style={{ borderBottom: `2px solid ${c.border}` }}>
+                {["#", "行動", "預期效果", "工作量"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>{shortItems.map(s => (
+                <tr key={s.id}><td style={{ ...tdStyle, color: c.red, fontWeight: 700, width: 30 }}>{s.id}</td><td style={{ ...tdStyle, color: c.text, fontWeight: 600 }}>{s.action}</td><td style={{ ...tdStyle, color: c.textMuted }}>{s.effect}</td><td style={{ ...tdStyle, color: c.accent, fontWeight: 600, whiteSpace: "nowrap" }}>{s.effort}</td></tr>
+              ))}</tbody>
+            </table>
+          </div>
+
+          <div style={{ fontSize: 15, fontWeight: 700, color: c.coral, marginBottom: 8 }}>中期（1-3 個月）：策略調整</div>
+          <div style={{ background: c.card, borderRadius: 10, border: `1px solid ${c.border}`, overflow: "hidden", marginBottom: 20 }}>
+            <table style={tableStyle}>
+              <thead><tr style={{ borderBottom: `2px solid ${c.border}` }}>
+                {["#", "行動", "說明"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>{midItems.map(m => (
+                <tr key={m.id}><td style={{ ...tdStyle, color: c.coral, fontWeight: 700, width: 30 }}>{m.id}</td><td style={{ ...tdStyle, color: c.text, fontWeight: 600 }}>{m.action}</td><td style={{ ...tdStyle, color: c.textMuted }}>{m.effect}</td></tr>
+              ))}</tbody>
+            </table>
+          </div>
+
+          <div style={{ fontSize: 15, fontWeight: 700, color: c.blue, marginBottom: 8 }}>長期（3-6 個月）：結構性改變</div>
+          <div style={{ background: c.card, borderRadius: 10, border: `1px solid ${c.border}`, overflow: "hidden" }}>
+            <table style={tableStyle}>
+              <thead><tr style={{ borderBottom: `2px solid ${c.border}` }}>
+                {["#", "行動", "說明"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>{longItems.map(l => (
+                <tr key={l.id}><td style={{ ...tdStyle, color: c.blue, fontWeight: 700, width: 30 }}>{l.id}</td><td style={{ ...tdStyle, color: c.text, fontWeight: 600 }}>{l.action}</td><td style={{ ...tdStyle, color: c.textMuted }}>{l.effect}</td></tr>
+              ))}</tbody>
+            </table>
           </div>
         </div>
       );
     },
     // ── P8 數據限制說明 ──
     () => {
-      const hasImpressions = videos.some(v => v.impressions > 0);
       const hasRevenue = videos.some(v => v.estimatedRevenue > 0);
       const hasTrafficDetail = videos.some(v => v.trafficDetail && v.trafficDetail.length > 0);
       const hasSubViews = videos.some(v => v.subscribedViews > 0);
       const dataItems = [
-        { name: "基本指標（觀看、按讚、留言、分享）", status: "✅ 完整", color: c.green },
-        { name: "訂閱增減", status: "✅ 完整", color: c.green },
-        { name: "主要流量來源", status: "✅ 完整（但無細分）", color: c.green },
-        { name: "平均觀看時長", status: "✅ 完整", color: c.green },
-        { name: "曝光次數 / CTR", status: hasImpressions ? "✅ 有數據" : "⚠ 缺少", color: hasImpressions ? c.green : c.coral },
-        { name: "Browse / Suggested 細分流量", status: hasTrafficDetail ? "✅ 有數據" : "⚠ 缺少", color: hasTrafficDetail ? c.green : c.coral },
-        { name: "訂閱者 vs 非訂閱者觀看數", status: hasSubViews ? "✅ 有數據" : "⚠ 缺少", color: hasSubViews ? c.green : c.coral },
-        { name: "收益數據（RPM、CPM）", status: hasRevenue ? "✅ 有數據" : "⚠ 缺少", color: hasRevenue ? c.green : c.coral },
-        { name: "總訂閱數", status: "⚠ 以累計訂閱增減估算", color: c.coral },
-        { name: "競品對標數據", status: "❌ 需手動補充", color: c.red },
-        { name: "縮圖 CTR 趨勢", status: "❌ 需 YouTube Studio 匯出", color: c.red },
+        { name: "基本指標（觀看、按讚、留言、分享）", src: "data.xlsx", status: "✅ 完整", color: c.green },
+        { name: "訂閱增減", src: "data.xlsx", status: "✅ 完整", color: c.green },
+        { name: "主要流量來源", src: "traffic 欄位", status: "✅ 僅記錄單一主要來源，非完整分布", color: c.green },
+        { name: "平均觀看時長", src: "data.xlsx", status: "✅ 完整", color: c.green },
+        { name: "曝光次數 / CTR", src: "reach_data.json", status: hasReach ? "✅ 已整合" : "⚠ 缺少", color: hasReach ? c.green : c.coral },
+        { name: "Browse / Suggested 細分流量", src: "YouTube Studio", status: "⚠ 缺少（目前僅有主要來源欄位）", color: c.coral },
+        { name: "訂閱者 vs 非訂閱者觀看數", src: "data.xlsx", status: hasSubViews ? "✅ 有數據" : "⚠ 缺少", color: hasSubViews ? c.green : c.coral },
+        { name: "收益數據", src: "data.xlsx", status: hasRevenue ? "✅ 有數據" : "⚠ 缺少", color: hasRevenue ? c.green : c.coral },
+        { name: "總訂閱數", src: "公式設定 / 手動", status: `✅ ${fmt(channelSubs)}（需定期更新）`, color: c.green },
+        { name: "真正的 AVD%（完看率）", src: "YouTube Studio", status: "❌ 缺少", color: c.red },
+        { name: "回訪觀眾比例", src: "YouTube Studio", status: "❌ 缺少", color: c.red },
+        { name: "長期歷史趨勢", src: "—", status: "⚠ 僅 ~2 個月窗口", color: c.coral },
       ];
       return (
         <div>
-          {badge("數據限制", c.textMuted)}
-          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 20 }}>數據完整度與限制</div>
-          <div style={{ background: c.card, borderRadius: 12, border: `1px solid ${c.border}`, overflow: "hidden", marginBottom: 24 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          {badge("附錄", c.textMuted)}
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>數據來源與限制</div>
+          <div style={{ fontSize: 12, color: c.textMuted, marginBottom: 16 }}>本診斷採用「七維度診斷模型」，從數據和外部審計交叉分析，區分根因（需改變策略）和症狀（改善根因後自動消失）</div>
+          <div style={{ background: c.card, borderRadius: 12, border: `1px solid ${c.border}`, overflow: "hidden", marginBottom: 20 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead><tr style={{ borderBottom: `2px solid ${c.border}` }}>
-                {["數據項目", "狀態"].map(h => (
-                  <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: c.textMuted, background: c.cardAlt }}>{h}</th>
+                {["數據項目", "來源", "狀態"].map(h => (
+                  <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: c.textMuted, background: c.cardAlt }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {dataItems.map(d => (
                   <tr key={d.name} style={{ borderBottom: `1px solid ${c.border}` }}>
-                    <td style={{ padding: "10px 16px", color: c.text }}>{d.name}</td>
-                    <td style={{ padding: "10px 16px", color: d.color, fontWeight: 500 }}>{d.status}</td>
+                    <td style={{ padding: "8px 14px", color: c.text }}>{d.name}</td>
+                    <td style={{ padding: "8px 14px", color: c.textDim, fontSize: 11 }}>{d.src}</td>
+                    <td style={{ padding: "8px 14px", color: d.color, fontWeight: 500 }}>{d.status}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div style={{ padding: "16px 20px", background: c.accent + "10", borderRadius: 10, borderLeft: `4px solid ${c.accent}` }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: c.accent, marginBottom: 8 }}>建議下一步</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {[
-                "對照 YouTube Studio 後台做進一步驗證",
-                "匯出「流量來源」細分報表，補充 Browse/Suggested 數據",
-                "執行 python yt_data_fetcher.py 抓取最新收益與曝光數據",
-                "整理競品頻道資料，用於對標分析",
-              ].map((tip, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                  <span style={{ color: c.accent, fontSize: 14, fontFamily: mono, fontWeight: 700, minWidth: 20 }}>{i + 1}.</span>
-                  <span style={{ color: c.text, fontSize: 13, lineHeight: 1.6 }}>{tip}</span>
-                </div>
-              ))}
-            </div>
+          <div style={{ padding: "14px 18px", background: c.accent + "10", borderRadius: 10, borderLeft: `4px solid ${c.accent}` }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: c.accent, marginBottom: 6 }}>建議下一步</div>
+            {[
+              "對照 YouTube Studio 後台「流量來源」細分報表驗證 Browse/Suggested 實際佔比",
+              "定期更新 reach_data.json（曝光/CTR）與公式設定中的總訂閱數",
+              "匯出 YouTube Studio 「觀看時間」報表補充真正 AVD%",
+              "整理 2-3 個同類競品頻道資料，用於對標分析（訂閱數、觀看穩定度、定位）",
+            ].map((tip, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
+                <span style={{ color: c.accent, fontFamily: mono, fontWeight: 700, minWidth: 18, fontSize: 12 }}>{i + 1}.</span>
+                <span style={{ color: c.text, fontSize: 12, lineHeight: 1.6 }}>{tip}</span>
+              </div>
+            ))}
           </div>
         </div>
       );
@@ -3217,6 +3286,7 @@ export default function App() {
   const [showReport, setShowReport] = useState(false);
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const [showDiagnosis, setShowDiagnosis] = useState(false);
+  const [reachData, setReachData] = useState({});
   const c = isDark ? themes.dark : themes.light;
 
   useEffect(() => {
@@ -3228,6 +3298,10 @@ export default function App() {
           .then(setRawData)
           .catch(() => setRawData(null))
       );
+    fetch(import.meta.env.BASE_URL + "reach_data.json")
+      .then(r => r.ok ? r.json() : {})
+      .then(setReachData)
+      .catch(() => setReachData({}));
   }, []);
 
   const { fullVideos, abTests, abSuggestions, formulaConfig, recordTime } = useMemo(() => {
@@ -3322,7 +3396,7 @@ export default function App() {
       </div>
       {showReport && <ReportModal allVideos={fullVideos} allAbTests={abTests} C={c} onClose={() => setShowReport(false)} />}
       {showHealthCheck && <HealthCheckModal allVideos={fullVideos} allAbTests={abTests} C={c} onClose={() => setShowHealthCheck(false)} />}
-      {showDiagnosis && <DiagnosisModal allVideos={fullVideos} allAbTests={abTests} C={c} onClose={() => setShowDiagnosis(false)} />}
+      {showDiagnosis && <DiagnosisModal allVideos={fullVideos} allAbTests={abTests} reachData={reachData} formulaConfig={formulaConfig} C={c} onClose={() => setShowDiagnosis(false)} />}
     </div>
   );
 }
