@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { BarChart, Bar, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
+import { BarChart, Bar, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart, ComposedChart } from "recharts";
 
 // ── Theme system ──
 const themes = {
@@ -25,7 +25,7 @@ const themes = {
 
 // ── Data ──
 const SHEET_ID = "10Eh6MhCHdcDFi-d1WHbYJS_sbsSUkxNctDNcc3kum9Y";
-const TABS = ["總覽", "商機指標", "12類選題", "A/B 文案", "TA 輪廓", "來賓效應", "行動建議"];
+const TABS = ["總覽", "商機指標", "12類選題", "A/B 文案", "TA 輪廓", "來賓效應", "收益", "行動建議"];
 const SHOWS = ["全部", "授ㄉㄟ私捏", "防詐特攻隊", "醫起好健康"];
 
 function parseCSV(text) {
@@ -92,6 +92,18 @@ async function loadFromSheets() {
       type: r[col("影片類型")] || "完整集", guest: r[col("來賓姓名")] || "",
       topic: r[col("選題大類")] || r[col("選題類別")] || "未分類",
       ep: r[col("集數")] || "",
+      trafficDetail: r[col("流量來源明細")] || "",
+      estimatedRevenue: +r[col("預估收益")] || 0,
+      estimatedAdRevenue: +r[col("預估廣告收益")] || 0,
+      redPartnerRevenue: +r[col("Red夥伴收益")] || 0,
+      grossRevenue: +r[col("總收益")] || 0,
+      cpm: +r[col("CPM")] || 0,
+      playbackCpm: +r[col("播放CPM")] || 0,
+      subscribedViews: +r[col("訂閱者觀看次數")] || 0,
+      subscribedMinutes: +r[col("訂閱者觀看分鐘")] || 0,
+      unsubscribedViews: +r[col("非訂閱者觀看次數")] || 0,
+      unsubscribedMinutes: +r[col("非訂閱者觀看分鐘")] || 0,
+      searchTerms: r[col("搜尋關鍵字 Top10")] || "",
     });
 
     const copyA = r[col("縮圖文案 A")], copyB = r[col("縮圖文案 B")];
@@ -302,6 +314,90 @@ function WidthSwitch({ isFullWidth, toggle, C: c }) {
   );
 }
 
+// ── Channel Funnel ──
+function ChannelFunnel({ fullVideos, C: c }) {
+  const totalViews = fullVideos.reduce((a, v) => a + v.views, 0);
+  const totalSubs = Math.max(fullVideos.reduce((a, v) => a + v.subs, 0), 0);
+  const hasImpressions = false;
+  const layers = hasImpressions
+    ? [{ label: "曝光次數", value: 0, color: c.blue }, { label: "觀看次數", value: totalViews, color: c.accent }, { label: "訂閱增長", value: totalSubs, color: c.green }]
+    : [{ label: "觀看次數", value: totalViews, color: c.accent }, { label: "訂閱增長", value: totalSubs, color: c.green }];
+  const maxVal = layers[0].value || 1;
+
+  return (
+    <Section title="頻道成效漏斗" sub={hasImpressions ? "曝光 → 觀看 → 訂閱" : "觀看 → 訂閱（曝光數據需 Reach Report）"}>
+      <Card C={c}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, padding: "20px 0" }}>
+          {layers.map((layer, i) => {
+            const widthPct = Math.max((layer.value / maxVal) * 100, 15);
+            const nextVal = layers[i + 1]?.value;
+            const convRate = nextVal != null && layer.value > 0 ? (nextVal / layer.value * 100).toFixed(2) : null;
+            return (
+              <div key={layer.label} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <div style={{
+                  width: `${widthPct}%`, minWidth: 120, padding: "16px 20px",
+                  background: layer.color + "18", border: `1px solid ${layer.color}40`,
+                  borderRadius: 8, textAlign: "center", position: "relative",
+                }}>
+                  <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 4 }}>{layer.label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: layer.color, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(layer.value)}</div>
+                </div>
+                {convRate && (
+                  <div style={{ padding: "6px 0", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ color: c.textDim, fontSize: 16 }}>↓</span>
+                    <span style={{ color: c.accent, fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{convRate}%</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {!hasImpressions && (
+          <div style={{ textAlign: "center", padding: "8px 0 4px", color: c.textDim, fontSize: 11 }}>
+            曝光次數與 CTR 需設定 Reach Report 後才會顯示完整三層漏斗
+          </div>
+        )}
+      </Card>
+    </Section>
+  );
+}
+
+// ── Monthly Trend ──
+function MonthlyTrend({ fullVideos, C: c }) {
+  const monthlyData = useMemo(() => {
+    const map = {};
+    fullVideos.forEach(v => {
+      if (!v.date) return;
+      const month = v.date.substring(0, 7);
+      if (!map[month]) map[month] = { month, watchHours: 0, count: 0 };
+      map[month].watchHours += v.watchMin / 60;
+      map[month].count++;
+    });
+    return Object.values(map).sort((a, b) => a.month.localeCompare(b.month)).map(m => ({ ...m, watchHours: +m.watchHours.toFixed(1) }));
+  }, [fullVideos]);
+
+  if (monthlyData.length < 2) return null;
+
+  return (
+    <Section title="月趨勢" sub="觀看時數（面積）+ 發布影片數（長條）">
+      <Card C={c}>
+        <ResponsiveContainer width="100%" height={300}>
+          <ComposedChart data={monthlyData}>
+            <CartesianGrid strokeDasharray="3 3" stroke={c.border} />
+            <XAxis dataKey="month" stroke={c.textDim} fontSize={11} />
+            <YAxis yAxisId="left" stroke={c.accent} fontSize={11} label={{ value: "觀看時數", angle: -90, position: "insideLeft", fill: c.textMuted, fontSize: 11 }} />
+            <YAxis yAxisId="right" orientation="right" stroke={c.blue} fontSize={11} allowDecimals={false} label={{ value: "影片數", angle: 90, position: "insideRight", fill: c.textMuted, fontSize: 11 }} />
+            <Tooltip contentStyle={TT(c)} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Area yAxisId="left" type="monotone" dataKey="watchHours" name="觀看時數" fill={c.accent + "30"} stroke={c.accent} strokeWidth={2} />
+            <Bar yAxisId="right" dataKey="count" name="發布影片數" fill={c.blue} radius={[4, 4, 0, 0]} barSize={30} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </Card>
+    </Section>
+  );
+}
+
 // ── Tab: Overview ──
 function OverviewTab({ fullVideos, C: c }) {
   const total = fullVideos.reduce((a, v) => ({ views: a.views + v.views, subs: a.subs + v.subs }), { views: 0, subs: 0 });
@@ -356,6 +452,8 @@ function OverviewTab({ fullVideos, C: c }) {
         )}
       />
     </Section>
+    <ChannelFunnel fullVideos={fullVideos} C={c} />
+    <MonthlyTrend fullVideos={fullVideos} C={c} />
   </div>);
 }
 
@@ -442,6 +540,82 @@ function CommercialTab({ fullVideos, formulaConfig: cfg = {}, C: c }) {
   </div>);
 }
 
+// ── Old vs New Traffic ──
+function OldVsNewTraffic({ fullVideos, C: c }) {
+  const { oldVideos, newVideos, oldViews, newViews, oldPct, newPct } = useMemo(() => {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const old = [], nw = [];
+    fullVideos.forEach(v => {
+      if (!v.date) return;
+      const d = new Date(v.date.replace(/\//g, "-"));
+      if (d < cutoff) old.push(v); else nw.push(v);
+    });
+    const ov = old.reduce((a, v) => a + v.views, 0);
+    const nv = nw.reduce((a, v) => a + v.views, 0);
+    const total = ov + nv || 1;
+    return { oldVideos: old, newVideos: nw, oldViews: ov, newViews: nv, oldPct: +(ov / total * 100).toFixed(1), newPct: +(nv / total * 100).toFixed(1) };
+  }, [fullVideos]);
+
+  const top3Old = [...oldVideos].sort((a, b) => b.views - a.views).slice(0, 3);
+  const top3New = [...newVideos].sort((a, b) => b.views - a.views).slice(0, 3);
+  const pieData = [{ name: `新片 (≤90天)`, value: newViews }, { name: `舊片 (>90天)`, value: oldViews }];
+  const pieColors = [c.accent, c.blue];
+
+  return (
+    <Section title="舊片 vs 新片流量佔比" sub="以 90 天為分界">
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        <Card C={c} style={{ flex: "1 1 280px", minWidth: 260 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <ResponsiveContainer width={160} height={160}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={3} strokeWidth={0}>
+                  {pieData.map((_, i) => <Cell key={i} fill={pieColors[i]} />)}
+                </Pie>
+                <Tooltip contentStyle={TT(c)} formatter={v => fmt(v)} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: c.accent }} />
+                <span style={{ color: c.text, fontSize: 13 }}>新片</span>
+                <span style={{ color: c.accent, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{newPct}%</span>
+                <span style={{ color: c.textDim, fontSize: 11 }}>({newVideos.length} 支)</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: c.blue }} />
+                <span style={{ color: c.text, fontSize: 13 }}>舊片</span>
+                <span style={{ color: c.blue, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{oldPct}%</span>
+                <span style={{ color: c.textDim, fontSize: 11 }}>({oldVideos.length} 支)</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+        <div style={{ flex: "1 1 280px", display: "flex", flexDirection: "column", gap: 10, minWidth: 260 }}>
+          <Card C={c} style={{ borderLeft: `3px solid ${c.accent}` }}>
+            <div style={{ fontSize: 12, color: c.accent, fontWeight: 600, marginBottom: 8 }}>新片 Top 3</div>
+            {top3New.map((v, i) => (
+              <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span title={v.title} style={{ color: c.text, fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i + 1}. {v.title}</span>
+                <span style={{ color: c.accent, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, marginLeft: 8 }}>{fmt(v.views)}</span>
+              </div>
+            ))}
+          </Card>
+          <Card C={c} style={{ borderLeft: `3px solid ${c.blue}` }}>
+            <div style={{ fontSize: 12, color: c.blue, fontWeight: 600, marginBottom: 8 }}>舊片 Top 3</div>
+            {top3Old.map((v, i) => (
+              <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span title={v.title} style={{ color: c.text, fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i + 1}. {v.title}</span>
+                <span style={{ color: c.blue, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, marginLeft: 8 }}>{fmt(v.views)}</span>
+              </div>
+            ))}
+          </Card>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 // ── Tab: 12 Topics ──
 function TopicTab({ fullVideos, C: c }) {
   const topicStats = useMemo(() => {
@@ -486,6 +660,7 @@ function TopicTab({ fullVideos, C: c }) {
         )}
       />
     </Section>
+    <OldVsNewTraffic fullVideos={fullVideos} C={c} />
   </div>);
 }
 
@@ -701,6 +876,119 @@ function ABTab({ abTests, abSuggestions, C: c }) {
   </div>);
 }
 
+// ── Subscriber Analysis ──
+function SubscriberAnalysis({ videos, C: c }) {
+  const hasData = videos.some(v => v.subscribedViews > 0 || v.unsubscribedViews > 0);
+  if (!hasData) {
+    return (
+      <Section title="訂閱者 vs 非訂閱者" sub="觀看行為比較">
+        <Card C={c}><div style={{ textAlign: "center", padding: 30, color: c.textDim, fontSize: 13 }}>待腳本更新後填入數據</div></Card>
+      </Section>
+    );
+  }
+  const totalSubViews = videos.reduce((a, v) => a + v.subscribedViews, 0);
+  const totalUnsubViews = videos.reduce((a, v) => a + v.unsubscribedViews, 0);
+  const totalSubMin = videos.reduce((a, v) => a + v.subscribedMinutes, 0);
+  const totalUnsubMin = videos.reduce((a, v) => a + v.unsubscribedMinutes, 0);
+  const totalMin = totalSubMin + totalUnsubMin || 1;
+  const subMinPct = +(totalSubMin / totalMin * 100).toFixed(1);
+  const unsubMinPct = +(totalUnsubMin / totalMin * 100).toFixed(1);
+  const subAvgWatch = totalSubViews > 0 ? +(totalSubMin / totalSubViews).toFixed(1) : 0;
+  const unsubAvgWatch = totalUnsubViews > 0 ? +(totalUnsubMin / totalUnsubViews).toFixed(1) : 0;
+
+  const pieData = [{ name: "訂閱者", value: totalSubMin }, { name: "非訂閱者", value: totalUnsubMin }];
+  const colors = [c.green, c.blue];
+
+  return (
+    <Section title="訂閱者 vs 非訂閱者" sub="觀看行為比較">
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <Card C={c} style={{ flex: "1 1 260px", minWidth: 240 }}>
+          <div style={{ fontSize: 12, color: c.textMuted, marginBottom: 12 }}>觀看時間佔比</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <ResponsiveContainer width={140} height={140}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={3} strokeWidth={0}>
+                  {pieData.map((_, i) => <Cell key={i} fill={colors[i]} />)}
+                </Pie>
+                <Tooltip contentStyle={TT(c)} formatter={v => `${(v / 60).toFixed(0)} hr`} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: c.green }} />
+                <span style={{ color: c.text, fontSize: 12 }}>訂閱者</span>
+                <span style={{ color: c.green, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{subMinPct}%</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: c.blue }} />
+                <span style={{ color: c.text, fontSize: 12 }}>非訂閱者</span>
+                <span style={{ color: c.blue, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{unsubMinPct}%</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+        <Card C={c} style={{ flex: "1 1 260px", minWidth: 240 }}>
+          <div style={{ fontSize: 12, color: c.textMuted, marginBottom: 12 }}>平均觀看時長比較（分鐘/次）</div>
+          <div style={{ display: "flex", gap: 20, alignItems: "flex-end", padding: "20px 0" }}>
+            {[{ label: "訂閱者", val: subAvgWatch, color: c.green }, { label: "非訂閱者", val: unsubAvgWatch, color: c.blue }].map(b => (
+              <div key={b.label} style={{ flex: 1, textAlign: "center" }}>
+                <div style={{ height: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center" }}>
+                  <div style={{ width: 50, background: b.color + "30", border: `1px solid ${b.color}`, borderRadius: "6px 6px 0 0", height: `${Math.max((b.val / Math.max(subAvgWatch, unsubAvgWatch, 1)) * 80, 10)}px`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ color: b.color, fontSize: 14, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{b.val}</span>
+                  </div>
+                </div>
+                <div style={{ color: c.textMuted, fontSize: 11, marginTop: 6 }}>{b.label}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </Section>
+  );
+}
+
+// ── Search Terms ──
+function SearchTermsChart({ videos, C: c }) {
+  const termsData = useMemo(() => {
+    const map = {};
+    videos.forEach(v => {
+      if (!v.searchTerms) return;
+      v.searchTerms.split(", ").forEach(s => {
+        const match = s.match(/^(.+)\s*\((\d+)\)$/);
+        if (match) {
+          const term = match[1].trim(), views = +match[2];
+          map[term] = (map[term] || 0) + views;
+        }
+      });
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([term, views]) => ({ term, views }));
+  }, [videos]);
+
+  if (!termsData.length) {
+    return (
+      <Section title="熱門搜尋字詞" sub="前 10 個搜尋關鍵字">
+        <Card C={c}><div style={{ textAlign: "center", padding: 30, color: c.textDim, fontSize: 13 }}>待腳本更新後填入數據</div></Card>
+      </Section>
+    );
+  }
+
+  return (
+    <Section title="熱門搜尋字詞" sub="前 10 個搜尋關鍵字（依觀看數排序）">
+      <Card C={c}>
+        <ResponsiveContainer width="100%" height={Math.max(termsData.length * 36, 180)}>
+          <BarChart data={termsData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={c.border} horizontal={false} />
+            <XAxis type="number" stroke={c.textDim} fontSize={11} />
+            <YAxis type="category" dataKey="term" stroke={c.textDim} fontSize={11} width={120} tick={{ fill: c.text }} />
+            <Tooltip contentStyle={TT(c)} />
+            <Bar dataKey="views" name="觀看次數" fill={c.teal} radius={[0, 5, 5, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
+    </Section>
+  );
+}
+
 // ── Tab: TA ──
 function TATab({ fullVideos, selectedShow, C: c }) {
   const sv = selectedShow === "全部" ? fullVideos : fullVideos.filter(v => v.show === selectedShow);
@@ -734,6 +1022,126 @@ function TATab({ fullVideos, selectedShow, C: c }) {
           </div>
         </div>
       ))}</Card>
+    </Section>
+    <SubscriberAnalysis videos={sv} C={c} />
+    <SearchTermsChart videos={sv} C={c} />
+  </div>);
+}
+
+// ── Tab: Revenue ──
+function RevenueTab({ fullVideos, C: c }) {
+  const hasRevenue = fullVideos.some(v => v.estimatedRevenue > 0);
+
+  if (!hasRevenue) {
+    return (
+      <div>
+        <Card C={c} style={{ textAlign: "center", padding: 50 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>$</div>
+          <div style={{ fontSize: 16, color: c.text, fontWeight: 600, marginBottom: 8 }}>收益數據尚未填入</div>
+          <div style={{ fontSize: 13, color: c.textMuted, lineHeight: 1.8 }}>
+            待腳本更新後填入<br />
+            需要在 Google Cloud Console 啟用 YouTube Analytics (Monetary) API<br />
+            並確認頻道已開啟營利功能
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  const totalRevenue = fullVideos.reduce((a, v) => a + v.estimatedRevenue, 0);
+  const totalViews = fullVideos.reduce((a, v) => a + v.views, 0);
+  const avgRPM = totalViews > 0 ? +(totalRevenue / totalViews * 1000).toFixed(2) : 0;
+
+  const showRevenue = useMemo(() => {
+    const map = {};
+    fullVideos.forEach(v => {
+      if (!v.show || v.estimatedRevenue <= 0) return;
+      if (!map[v.show]) map[v.show] = { show: v.show, revenue: 0, views: 0, count: 0 };
+      map[v.show].revenue += v.estimatedRevenue;
+      map[v.show].views += v.views;
+      map[v.show].count++;
+    });
+    return Object.values(map).map(s => ({
+      ...s, rpm: s.views > 0 ? +(s.revenue / s.views * 1000).toFixed(2) : 0,
+      avgRevenue: +(s.revenue / s.count).toFixed(2),
+    })).sort((a, b) => b.revenue - a.revenue);
+  }, [fullVideos]);
+
+  const topEarners = [...fullVideos].filter(v => v.estimatedRevenue > 0).sort((a, b) => b.estimatedRevenue - a.estimatedRevenue).slice(0, 10);
+
+  return (<div>
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <KPI label="總預估收益" value={`$${totalRevenue.toFixed(0)}`} color={c.green} C={c} />
+      <KPI label="平均 RPM" value={`$${avgRPM}`} sub="每千次觀看收益" color={c.accent} C={c} />
+      <KPI label="有收益影片" value={fullVideos.filter(v => v.estimatedRevenue > 0).length} sub={`共 ${fullVideos.length} 支`} C={c} />
+    </div>
+
+    <Section title="各節目 RPM 比較">
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {showRevenue.map(s => (
+          <Card key={s.show} C={c} style={{ flex: "1 1 200px", minWidth: 180 }}>
+            <div style={{ color: c.text, fontWeight: 600, fontSize: 14, marginBottom: 12 }}>{s.show}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ color: c.textMuted, fontSize: 11 }}>總收益</span>
+              <span style={{ color: c.green, fontFamily: "'JetBrains Mono', monospace" }}>${s.revenue.toFixed(0)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ color: c.textMuted, fontSize: 11 }}>RPM</span>
+              <span style={{ color: c.accent, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>${s.rpm}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ color: c.textMuted, fontSize: 11 }}>平均每集收益</span>
+              <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>${s.avgRevenue}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ color: c.textMuted, fontSize: 11 }}>集數</span>
+              <span style={{ color: c.textMuted }}>{s.count}</span>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </Section>
+
+    {showRevenue.length > 1 && (
+      <Section title="節目 RPM 分布">
+        <Card C={c}>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={showRevenue}>
+              <CartesianGrid strokeDasharray="3 3" stroke={c.border} />
+              <XAxis dataKey="show" stroke={c.textDim} fontSize={11} />
+              <YAxis stroke={c.textDim} fontSize={11} />
+              <Tooltip contentStyle={TT(c)} formatter={v => `$${v}`} />
+              <Bar dataKey="rpm" name="RPM" fill={c.accent} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      </Section>
+    )}
+
+    <Section title="收益 Top 10" sub="依預估收益排序">
+      <SortableTable C={c} headers={["集數", "節目", "標題", "觀看", "預估收益", "CPM", "播放CPM"]}
+        dataKeys={["ep", "show", "title", "views", "estimatedRevenue", "cpm", "playbackCpm"]}
+        data={topEarners}
+        renderRow={(v, i) => (
+          <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
+            <td style={{ padding: "10px 14px", color: c.text, fontWeight: 500 }}>{v.ep}</td>
+            <td style={{ padding: "10px 14px" }}><Tag text={v.show} color={c.colors6[SHOWS.indexOf(v.show) % 6]} C={c} /></td>
+            <td title={v.title} style={{ padding: "10px 14px", color: c.text, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.title}</td>
+            <td style={{ padding: "10px 14px", color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(v.views)}</td>
+            <td style={{ padding: "10px 14px", color: c.green, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>${v.estimatedRevenue.toFixed(2)}</td>
+            <td style={{ padding: "10px 14px", color: c.accent, fontFamily: "'JetBrains Mono', monospace" }}>${v.cpm.toFixed(2)}</td>
+            <td style={{ padding: "10px 14px", color: c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>${v.playbackCpm.toFixed(2)}</td>
+          </tr>
+        )}
+      />
+    </Section>
+
+    <Section title="各市場觀看與 CPM 比較">
+      <Card C={c}>
+        <div style={{ textAlign: "center", padding: 30, color: c.textDim, fontSize: 13 }}>
+          待腳本新增國家/地區維度後填入（TW, US, HK 等）
+        </div>
+      </Card>
     </Section>
   </div>);
 }
@@ -879,7 +1287,8 @@ export default function App() {
         {tab === 3 && <ABTab abTests={abTests} abSuggestions={abSuggestions} C={c} />}
         {tab === 4 && <TATab fullVideos={fullVideos} selectedShow={show} C={c} />}
         {tab === 5 && <GuestTab fullVideos={fullVideos} C={c} />}
-        {tab === 6 && <ActionTab C={c} />}
+        {tab === 6 && <RevenueTab fullVideos={fullVideos} C={c} />}
+        {tab === 7 && <ActionTab C={c} />}
       </div>
     </div>
   );
