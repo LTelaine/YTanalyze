@@ -466,6 +466,14 @@ function OverviewTab({ fullVideos, C: c }) {
     return { show: s, count: sv.length, totalViews: sv.reduce((a, v) => a + v.views, 0), avgViews: Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length), totalSubs: sv.reduce((a, v) => a + v.subs, 0), avgInteract: +(sv.reduce((a, v) => a + v.interactRate, 0) / sv.length).toFixed(2), avgCommercial: +(sv.reduce((a, v) => a + v.commercialIdx, 0) / sv.length).toFixed(1) };
   }).filter(Boolean).sort((a, b) => b.totalViews - a.totalViews);
 
+  const recentTop10 = useMemo(() => {
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    return fullVideos.filter(v => {
+      if (!v.date) return false;
+      return new Date(v.date.replace(/\//g, "-")) >= cutoff;
+    }).sort((a, b) => b.views - a.views).slice(0, 10);
+  }, [fullVideos]);
+
   return (<div>
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
       <KPI label="完整集" value={fullVideos.length} sub="不含 Shorts/Podcast" C={c} />
@@ -490,7 +498,26 @@ function OverviewTab({ fullVideos, C: c }) {
         )}
       />
     </Section>
-    <Section title="觀看數 Top 10" sub="點擊欄位標題可排序 ・ 滑鼠移到標題可看完整文字">
+    <Section title="近三個月觀看數 Top 10" sub={`上架日期 ≥ ${new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toLocaleDateString("zh-TW")} ・ 共 ${recentTop10.length} 支`}>
+      <SortableTable C={c} headers={["#", "節目", "集數", "標題", "上架時間", "觀看", "訂閱", "互動率", "商機"]}
+        dataKeys={[null, "show", "ep", "title", "date", "views", "subs", "interactRate", "commercialIdx"]}
+        data={recentTop10} defaultSortKey="views" maxHeight={520}
+        renderRow={(v, i) => (
+          <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
+            <td style={{ padding: "10px 14px", color: c.textDim }}>{i + 1}</td>
+            <td style={{ padding: "10px 14px" }}><Tag text={v.show} color={c.colors6[SHOWS.indexOf(v.show) % 6]} C={c} /></td>
+            <td style={{ padding: "10px 14px", color: c.textMuted }}><Tip text={v.date} C={c} inline>{v.ep}</Tip></td>
+            <VideoTitleCell v={v} C={c} />
+            <td style={{ padding: "10px 14px", color: c.textMuted, fontSize: 11, whiteSpace: "nowrap" }}>{v.date}</td>
+            <td style={{ padding: "10px 14px", color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(v.views)}</td>
+            <td style={{ padding: "10px 14px", color: v.subs > 0 ? c.green : v.subs < 0 ? c.red : c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{v.subs > 0 ? `+${v.subs}` : v.subs}</td>
+            <td style={{ padding: "10px 14px", color: c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{v.interactRate}%</td>
+            <td style={{ padding: "10px 14px", color: c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{v.commercialIdx}</td>
+          </tr>
+        )}
+      />
+    </Section>
+    <Section title="觀看數 Top 10" sub="所有時間 ・ 點擊欄位標題可排序 ・ 滑鼠移到標題可看完整文字">
       <SortableTable C={c} headers={["#", "節目", "集數", "標題", "流量來源", "觀看", "訂閱", "互動率", "商機"]}
         dataKeys={[null, "show", "ep", "title", "traffic", "views", "subs", "interactRate", "commercialIdx"]}
         data={fullVideos} defaultSortKey="views" maxHeight={520}
