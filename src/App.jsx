@@ -499,16 +499,15 @@ function OverviewTab({ fullVideos, C: c }) {
       />
     </Section>
     <Section title="近三個月觀看數 Top 10" sub={`上架日期 ≥ ${new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toLocaleDateString("zh-TW")} ・ 共 ${recentTop10.length} 支`}>
-      <SortableTable C={c} headers={["#", "節目", "集數", "標題", "上架時間", "觀看", "訂閱", "互動率", "商機"]}
-        dataKeys={[null, "show", "ep", "title", "date", "views", "subs", "interactRate", "commercialIdx"]}
+      <SortableTable C={c} headers={["上架日期", "節目", "集數", "標題", "觀看", "訂閱", "互動率", "商機"]}
+        dataKeys={["date", "show", "ep", "title", "views", "subs", "interactRate", "commercialIdx"]}
         data={recentTop10} defaultSortKey="views" maxHeight={520}
         renderRow={(v, i) => (
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
-            <td style={{ padding: "10px 14px", color: c.textDim }}>{i + 1}</td>
+            <td style={{ padding: "10px 14px", color: c.textMuted, fontSize: 11, whiteSpace: "nowrap" }}>{v.date}</td>
             <td style={{ padding: "10px 14px" }}><Tag text={v.show} color={c.colors6[SHOWS.indexOf(v.show) % 6]} C={c} /></td>
             <td style={{ padding: "10px 14px", color: c.textMuted }}><Tip text={v.date} C={c} inline>{v.ep}</Tip></td>
             <VideoTitleCell v={v} C={c} />
-            <td style={{ padding: "10px 14px", color: c.textMuted, fontSize: 11, whiteSpace: "nowrap" }}>{v.date}</td>
             <td style={{ padding: "10px 14px", color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(v.views)}</td>
             <td style={{ padding: "10px 14px", color: v.subs > 0 ? c.green : v.subs < 0 ? c.red : c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{v.subs > 0 ? `+${v.subs}` : v.subs}</td>
             <td style={{ padding: "10px 14px", color: c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{v.interactRate}%</td>
