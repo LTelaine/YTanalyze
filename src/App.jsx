@@ -466,13 +466,16 @@ function OverviewTab({ fullVideos, C: c }) {
     return { show: s, count: sv.length, totalViews: sv.reduce((a, v) => a + v.views, 0), avgViews: Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length), totalSubs: sv.reduce((a, v) => a + v.subs, 0), avgInteract: +(sv.reduce((a, v) => a + v.interactRate, 0) / sv.length).toFixed(2), avgCommercial: +(sv.reduce((a, v) => a + v.commercialIdx, 0) / sv.length).toFixed(1) };
   }).filter(Boolean).sort((a, b) => b.totalViews - a.totalViews);
 
-  const recentTop10 = useMemo(() => {
+  const recentVideos = useMemo(() => {
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
     return fullVideos.filter(v => {
       if (!v.date) return false;
       return new Date(v.date.replace(/\//g, "-")) >= cutoff;
-    }).sort((a, b) => b.views - a.views).slice(0, 10);
+    }).sort((a, b) => b.views - a.views);
   }, [fullVideos]);
+  const [recentPage, setRecentPage] = useState(0);
+  const recentPerPage = 10;
+  const recentTotalPages = Math.max(1, Math.ceil(recentVideos.length / recentPerPage));
 
   return (<div>
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -498,10 +501,10 @@ function OverviewTab({ fullVideos, C: c }) {
         )}
       />
     </Section>
-    <Section title="近三個月觀看數 Top 10" sub={`上架日期 ≥ ${new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toLocaleDateString("zh-TW")} ・ 共 ${recentTop10.length} 支`}>
+    <Section title="近三個月的影片觀看數" sub={`上架日期 ≥ ${new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toLocaleDateString("zh-TW")} ・ 共 ${recentVideos.length} 支`}>
       <SortableTable C={c} headers={["上架日期", "節目", "集數", "標題", "觀看", "訂閱", "互動率", "商機"]}
         dataKeys={["date", "show", "ep", "title", "views", "subs", "interactRate", "commercialIdx"]}
-        data={recentTop10} defaultSortKey="views" maxHeight={520}
+        data={recentVideos.slice(recentPage * recentPerPage, (recentPage + 1) * recentPerPage)} defaultSortKey="views"
         renderRow={(v, i) => (
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
             <td style={{ padding: "10px 14px", color: c.textMuted, fontSize: 11, whiteSpace: "nowrap" }}>{v.date}</td>
@@ -515,6 +518,18 @@ function OverviewTab({ fullVideos, C: c }) {
           </tr>
         )}
       />
+      {recentTotalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 12 }}>
+          <button onClick={() => setRecentPage(p => Math.max(0, p - 1))} disabled={recentPage === 0}
+            style={{ background: "none", border: `1px solid ${c.border}`, borderRadius: 6, color: recentPage === 0 ? c.textDim : c.text, padding: "6px 12px", cursor: recentPage === 0 ? "default" : "pointer", fontSize: 12 }}>←</button>
+          {Array.from({ length: recentTotalPages }, (_, i) => (
+            <button key={i} onClick={() => setRecentPage(i)}
+              style={{ background: i === recentPage ? c.accent + "20" : "none", border: `1px solid ${i === recentPage ? c.accent : c.border}`, borderRadius: 6, color: i === recentPage ? c.accent : c.textMuted, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: i === recentPage ? 600 : 400, minWidth: 32 }}>{i + 1}</button>
+          ))}
+          <button onClick={() => setRecentPage(p => Math.min(recentTotalPages - 1, p + 1))} disabled={recentPage === recentTotalPages - 1}
+            style={{ background: "none", border: `1px solid ${c.border}`, borderRadius: 6, color: recentPage === recentTotalPages - 1 ? c.textDim : c.text, padding: "6px 12px", cursor: recentPage === recentTotalPages - 1 ? "default" : "pointer", fontSize: 12 }}>→</button>
+        </div>
+      )}
     </Section>
     <Section title="觀看數 Top 10" sub="所有時間 ・ 點擊欄位標題可排序 ・ 滑鼠移到標題可看完整文字">
       <SortableTable C={c} headers={["#", "節目", "集數", "標題", "流量來源", "觀看", "訂閱", "互動率", "商機"]}
