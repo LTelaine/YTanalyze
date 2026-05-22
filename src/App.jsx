@@ -1201,7 +1201,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
           return (
             <tr key={v.type} style={{ borderBottom: `1px solid ${c.border}` }}>
               <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500, fontSize: 12 }}>{v.type}</td>
-              <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.text, fontSize: 12 }}>{v.count}</td>
+              <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.text, fontSize: 12 }}><Tip text={v.eps.join("\n")} C={c} inline>{v.count}</Tip></td>
               <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.accent, fontWeight: 600, fontSize: 12 }}>{v.avgGap}%</td>
               <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.text }}>A:{v.wins.A} B:{v.wins.B}</td>
               <td style={{ padding: "12px 14px", fontSize: 11 }}>
