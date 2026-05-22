@@ -870,7 +870,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
       map[t.testVar].count++;
       map[t.testVar].totalGap += Math.abs(t.ctrB - t.ctrA);
       map[t.testVar].wins[t.winner]++;
-      map[t.testVar].eps.push(`${t.show} ${t.ep}｜${t.title}`);
+      map[t.testVar].eps.push(`▸ ${t.show} ${t.ep}｜${t.title}`);
       map[t.testVar].tests.push(t);
     });
     return Object.values(map).map(v => ({ ...v, avgGap: +(v.totalGap / v.count).toFixed(1) }));
@@ -941,17 +941,17 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
         const winnerFrame = t.winner === "A" ? `${t.mainFrameA || ""} ${t.frameA || ""}` : `${t.mainFrameB || ""} ${t.frameB || ""}`;
         return keywords.some(k => winnerFrame.toLowerCase().includes(k.toLowerCase()));
       });
-      return { name, color, desc, count: matched.length, wins: wins.length, winRate: matched.length > 0 ? Math.round(wins.length / matched.length * 100) : 0, eps: matched.map(t => `${t.show} ${t.ep}｜${t.title}`) };
+      return { name, color, desc, count: matched.length, wins: wins.length, winRate: matched.length > 0 ? Math.round(wins.length / matched.length * 100) : 0, eps: matched.map(t => `▸ ${t.show} ${t.ep}｜${t.title}`) };
     });
   }, [abTests, formulaDefs]);
 
   return (<div>
     {/* KPI row */}
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-      <KPI label="總測試次數" value={abTests.length} C={c} title={abTests.map(t => `${t.show} ${t.ep}｜${t.title}`).join("\n")} />
-      <KPI label="B 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "B").length / abTests.length * 100)}%`} color={c.green} C={c} title={`B 勝出：\n${abTests.filter(t => t.winner === "B").map(t => `${t.show} ${t.ep}｜${t.title}`).join("\n")}`} />
-      <KPI label="A 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "A").length / abTests.length * 100)}%`} color={c.coral} C={c} title={`A 勝出：\n${abTests.filter(t => t.winner === "A").map(t => `${t.show} ${t.ep}｜${t.title}`).join("\n")}`} />
-      <KPI label="平均 CTR 差距" value={`${(abTests.reduce((a, t) => a + Math.abs(t.ctrB - t.ctrA), 0) / abTests.length).toFixed(1)}%`} color={c.accent} C={c} title={abTests.map(t => `${t.show} ${t.ep}｜${t.title}: ${Math.abs(t.ctrB - t.ctrA).toFixed(1)}%`).join("\n")} />
+      <KPI label="總測試次數" value={abTests.length} C={c} title={abTests.map(t => `▸ ${t.show} ${t.ep}｜${t.title}`).join("\n")} />
+      <KPI label="B 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "B").length / abTests.length * 100)}%`} color={c.green} C={c} title={`B 勝出：\n${abTests.filter(t => t.winner === "B").map(t => `▸ ${t.show} ${t.ep}｜${t.title}`).join("\n")}`} />
+      <KPI label="A 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "A").length / abTests.length * 100)}%`} color={c.coral} C={c} title={`A 勝出：\n${abTests.filter(t => t.winner === "A").map(t => `▸ ${t.show} ${t.ep}｜${t.title}`).join("\n")}`} />
+      <KPI label="平均 CTR 差距" value={`${(abTests.reduce((a, t) => a + Math.abs(t.ctrB - t.ctrA), 0) / abTests.length).toFixed(1)}%`} color={c.accent} C={c} title={abTests.map(t => `▸ ${t.show} ${t.ep}｜${t.title}: ${Math.abs(t.ctrB - t.ctrA).toFixed(1)}%`).join("\n")} />
       <KPI label="最大 CTR 差距" value={`${Math.max(...abTests.map(t => Math.abs(t.ctrB - t.ctrA))).toFixed(1)}%`} sub={(() => { const t = abTests.reduce((a, b) => Math.abs(b.ctrB - b.ctrA) > Math.abs(a.ctrB - a.ctrA) ? b : a); return `${t.show} ${t.ep}`; })()} color={c.coral} C={c} />
     </div>
 
