@@ -458,38 +458,55 @@ function WidthSwitch({ isFullWidth, toggle, C: c }) {
 
 // ── Channel Funnel ──
 function ChannelFunnel({ fullVideos, reachData = {}, C: c }) {
+  const totalImpressions = fullVideos.reduce((a, v) => a + (reachData[v.id]?.impressions || 0), 0);
+  const totalViewsFromImp = fullVideos.reduce((a, v) => {
+    const r = reachData[v.id];
+    return a + (r ? r.impressions * (r.ctr / 100) : 0);
+  }, 0);
+  const avgCTR = totalImpressions > 0 ? (totalViewsFromImp / totalImpressions * 100).toFixed(1) : "0";
   const totalViews = fullVideos.reduce((a, v) => a + v.views, 0);
   const totalSubs = Math.max(fullVideos.reduce((a, v) => a + v.subs, 0), 0);
-  const totalImpressions = fullVideos.reduce((a, v) => a + (reachData[v.id]?.impressions || 0), 0);
   const hasImpressions = totalImpressions > 0;
-  const layers = hasImpressions
-    ? [{ label: "曝光次數", value: totalImpressions, color: c.blue }, { label: "觀看次數", value: totalViews, color: c.accent }, { label: "訂閱增長", value: totalSubs, color: c.green }]
-    : [{ label: "觀看次數", value: totalViews, color: c.accent }, { label: "訂閱增長", value: totalSubs, color: c.green }];
-  const maxVal = layers[0].value || 1;
+
+  const stages = hasImpressions ? [
+    { label: "曝光次數", value: totalImpressions, color: c.blue },
+    { label: "因曝光產生的觀看次數", value: Math.round(totalViewsFromImp), color: c.accent, connector: `${avgCTR}% 點擊率` },
+    { label: "訂閱增長", value: totalSubs, color: c.green, connector: totalSubs > 0 ? `${(totalSubs / Math.max(totalViewsFromImp, 1) * 100).toFixed(2)}% 訂閱轉換` : null },
+  ] : [
+    { label: "觀看次數", value: totalViews, color: c.accent },
+    { label: "訂閱增長", value: totalSubs, color: c.green, connector: totalSubs > 0 ? `${(totalSubs / Math.max(totalViews, 1) * 100).toFixed(2)}% 訂閱轉換` : null },
+  ];
+
+  // Log-scale width: 90% for largest, narrows proportionally
+  const maxLog = Math.log(stages[0].value + 1);
+  const scaledW = v => Math.max(28, Math.min(90, 28 + 62 * Math.log(v + 1) / maxLog));
+  const widths = stages.map(s => scaledW(s.value));
 
   return (
-    <Section title="頻道成效漏斗" sub={hasImpressions ? "縮圖曝光 → 點擊觀看 → 訂閱轉換（曝光 > 觀看 為正常漏斗結構）" : "觀看 → 訂閱（曝光數據需 Reach Report）"}>
+    <Section title="頻道成效漏斗" sub={hasImpressions ? "縮圖曝光 → 點擊觀看 → 訂閱轉換" : "觀看 → 訂閱（曝光數據需 Reach Report）"}>
       <Card C={c}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, padding: "20px 0", overflow: "hidden" }}>
-          {layers.map((layer, i) => {
-            const widthPct = Math.min(Math.max((layer.value / maxVal) * 100, 15), 100);
-            const nextVal = layers[i + 1]?.value;
-            const convRate = nextVal != null && layer.value > 0 ? (nextVal / layer.value * 100).toFixed(2) : null;
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0", overflow: "hidden" }}>
+          {stages.map((stage, i) => {
+            const w = widths[i];
+            const nextW = widths[i + 1];
+            const lPct = (100 - w) / 2;
+            const nextLPct = nextW != null ? (100 - nextW) / 2 : lPct;
             return (
-              <div key={layer.label} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <div style={{
-                  width: `${widthPct}%`, minWidth: 120, padding: "16px 20px",
-                  background: layer.color + "18", border: `1px solid ${layer.color}40`,
-                  borderRadius: 8, textAlign: "center", boxSizing: "border-box",
-                }}>
-                  <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 4 }}>{layer.label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: layer.color, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(layer.value)}</div>
+              <div key={stage.label} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                {/* Stage box */}
+                <div style={{ width: `${w}%`, padding: "14px 20px", background: stage.color + "18", border: `1px solid ${stage.color}40`, borderRadius: 6, textAlign: "center", boxSizing: "border-box" }}>
+                  <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 4 }}>{stage.label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: stage.color, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(stage.value)}</div>
                 </div>
-                {convRate && (
-                  <div style={{ padding: "6px 0", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ color: c.textDim, fontSize: 16 }}>↓</span>
-                    <span style={{ color: c.accent, fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{convRate}%</span>
-                    <span style={{ color: c.textDim, fontSize: 11 }}>{i === 0 ? "點擊率" : "訂閱轉換"}</span>
+                {/* Trapezoid connector */}
+                {nextW != null && (
+                  <div style={{ position: "relative", width: "100%", height: 44 }}>
+                    <div style={{ position: "absolute", inset: 0, background: stage.color + "0D", clipPath: `polygon(${lPct}% 0%, ${100 - lPct}% 0%, ${100 - nextLPct}% 100%, ${nextLPct}% 100%)` }} />
+                    {stage.connector && (
+                      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 12, fontWeight: 600, color: stage.color, whiteSpace: "nowrap", background: c.card + "EE", padding: "2px 10px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                        {stage.connector}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -497,7 +514,7 @@ function ChannelFunnel({ fullVideos, reachData = {}, C: c }) {
           })}
         </div>
         {!hasImpressions && (
-          <div style={{ textAlign: "center", padding: "8px 0 4px", color: c.textDim, fontSize: 11 }}>
+          <div style={{ textAlign: "center", padding: "4px 0 8px", color: c.textDim, fontSize: 11 }}>
             曝光次數與 CTR 需設定 Reach Report 後才會顯示完整三層漏斗
           </div>
         )}
