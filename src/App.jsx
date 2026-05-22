@@ -468,11 +468,11 @@ function ChannelFunnel({ fullVideos, reachData = {}, C: c }) {
   const maxVal = layers[0].value || 1;
 
   return (
-    <Section title="頻道成效漏斗" sub={hasImpressions ? "曝光 → 觀看 → 訂閱" : "觀看 → 訂閱（曝光數據需 Reach Report）"}>
+    <Section title="頻道成效漏斗" sub={hasImpressions ? "縮圖曝光 → 點擊觀看 → 訂閱轉換（曝光 > 觀看 為正常漏斗結構）" : "觀看 → 訂閱（曝光數據需 Reach Report）"}>
       <Card C={c}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, padding: "20px 0" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, padding: "20px 0", overflow: "hidden" }}>
           {layers.map((layer, i) => {
-            const widthPct = Math.max((layer.value / maxVal) * 100, 15);
+            const widthPct = Math.min(Math.max((layer.value / maxVal) * 100, 15), 100);
             const nextVal = layers[i + 1]?.value;
             const convRate = nextVal != null && layer.value > 0 ? (nextVal / layer.value * 100).toFixed(2) : null;
             return (
@@ -480,7 +480,7 @@ function ChannelFunnel({ fullVideos, reachData = {}, C: c }) {
                 <div style={{
                   width: `${widthPct}%`, minWidth: 120, padding: "16px 20px",
                   background: layer.color + "18", border: `1px solid ${layer.color}40`,
-                  borderRadius: 8, textAlign: "center", position: "relative",
+                  borderRadius: 8, textAlign: "center", boxSizing: "border-box",
                 }}>
                   <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 4 }}>{layer.label}</div>
                   <div style={{ fontSize: 22, fontWeight: 700, color: layer.color, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(layer.value)}</div>
@@ -489,6 +489,7 @@ function ChannelFunnel({ fullVideos, reachData = {}, C: c }) {
                   <div style={{ padding: "6px 0", display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ color: c.textDim, fontSize: 16 }}>↓</span>
                     <span style={{ color: c.accent, fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{convRate}%</span>
+                    <span style={{ color: c.textDim, fontSize: 11 }}>{i === 0 ? "點擊率" : "訂閱轉換"}</span>
                   </div>
                 )}
               </div>
