@@ -119,7 +119,7 @@ async function loadFromSheets() {
         winner: r[col("勝出版本")] || "",
         mainFrameA: r[col("A主要情緒框架")] || "", frameA: r[col("A 情緒框架")] || "",
         mainFrameB: r[col("B主要情緒框架")] || "", frameB: r[col("B 情緒框架")] || "",
-        testVar: r[col("測試變數")] || "",
+        testVar: r[col("測試變數")] || "", testVarDesc: r[col("測試變數說明")] || "",
         angleA: r[col("A 設計脈絡")] || "", angleB: r[col("B 設計脈絡")] || "",
         topicAngleA: r[col("A 議題角度")] || "", topicAngleB: r[col("B 議題角度")] || "",
         conclusion: r[col("AB 結論")] || "", suggestion: r[col("未來建議")] || "",
@@ -911,7 +911,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
             <tr key={t.ep} style={{ borderBottom: isExpanded ? "none" : `1px solid ${c.border}`, background: isExpanded ? c.sortHover : "transparent", transition: "background 0.15s" }}>
               <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500 }}><VideoPreviewTip id={t.id} title={t.title} date={t.date} C={c}>{t.ep}</VideoPreviewTip></td>
               <td style={{ padding: "12px 14px" }}><Tag text={t.show} color={c.colors6[SHOWS.indexOf(t.show) % 6]} C={c} /></td>
-              <td style={{ padding: "12px 14px" }}><Tip text={`A: ${t.topicAngleA || t.angleA || t.frameA}\nB: ${t.topicAngleB || t.angleB || t.frameB}`} C={c} inline><Tag text={t.testVar} color={t.testVar === "情緒框架" ? c.purple : t.testVar === "議題包裝" ? c.teal : c.coral} C={c} /></Tip></td>
+              <td style={{ padding: "12px 14px" }}><Tip text={`${t.testVarDesc ? `${t.testVar}：${t.testVarDesc}\n\n` : ""}A: ${t.topicAngleA || t.angleA || t.frameA}\nB: ${t.topicAngleB || t.angleB || t.frameB}`} C={c} inline><Tag text={t.testVar} color={t.testVar === "情緒框架" ? c.purple : t.testVar === "議題包裝" ? c.teal : c.coral} C={c} /></Tip></td>
               <td style={{ padding: "12px 14px", color: t.winner === "A" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Tip text={t.copyA} C={c} inline>{t.copyA}</Tip></td>
               <td style={{ padding: "12px 14px", color: t.winner === "B" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Tip text={t.copyB} C={c} inline>{t.copyB}</Tip></td>
               <td style={{ padding: "12px 14px", minWidth: 160 }}>
