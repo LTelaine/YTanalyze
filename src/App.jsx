@@ -164,12 +164,31 @@ async function loadFromSheets() {
     }
   } catch (e) {}
 
+  let formulaDefs = [];
+  try {
+    const fdUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent("文案公式")}&headers=1`;
+    const fdRes = await fetch(fdUrl);
+    if (fdRes.ok) {
+      const fdRows = parseCSV(await fdRes.text());
+      if (fdRows.length >= 2) {
+        const fdh = fdRows[0];
+        const nCol = fdh.indexOf("公式名稱"), kCol = fdh.indexOf("關鍵字"), dCol = fdh.indexOf("說明");
+        if (nCol !== -1 && kCol !== -1) {
+          fdRows.slice(1).forEach(r => {
+            const name = r[nCol], keywords = r[kCol], desc = r[dCol] || "";
+            if (name && keywords) formulaDefs.push({ name, keywords: keywords.split(/[,，、]/).map(k => k.trim()).filter(Boolean), desc });
+          });
+        }
+      }
+    }
+  } catch (e) {}
+
   const recordTime = videos.length > 0 ? (videos[0].date ? videos.reduce((latest, v) => {
     const rt = dataRows.find(r => r[col("影片 ID")] === v.id)?.[col("紀錄時間")] || "";
     return rt > latest ? rt : latest;
   }, "") : "") : "";
 
-  return { videos, abTests, abSuggestions, formulaConfig, recordTime };
+  return { videos, abTests, abSuggestions, formulaConfig, formulaDefs, recordTime };
 }
 
 function processVideos(rawVideos, cfg = {}) {
@@ -825,7 +844,7 @@ const FALLBACK_AB_TESTS = [
 ];
 
 // ── Tab: AB ──
-function ABTab({ abTests, abSuggestions, C: c }) {
+function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
   const BLOCK_COLORS = { "框架策略": c.accent, "議題包裝": c.teal, "下次測試方向": c.purple };
   const suggBlocks = useMemo(() => {
     const map = {};
@@ -841,6 +860,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
   const [abFrameFilter, setAbFrameFilter] = useState("全部");
   const [abWinnerFilter, setAbWinnerFilter] = useState("全部");
   const [openSuggBlock, setOpenSuggBlock] = useState(null);
+  const [abKeyword, setAbKeyword] = useState("");
 
   // Stats by test variable
   const varStats = useMemo(() => {
@@ -873,13 +893,15 @@ function ABTab({ abTests, abSuggestions, C: c }) {
 
   const trendData = useMemo(() => {
     return [...abTests].sort((a, b) => {
+      const dA = a.date || "", dB = b.date || "";
+      if (dA && dB) return dA.localeCompare(dB);
       const numA = parseInt(a.ep.replace(/\D/g, "")) || 0;
       const numB = parseInt(b.ep.replace(/\D/g, "")) || 0;
       return numA - numB;
     }).map((t, i, arr) => {
       const gap = Math.abs(t.ctrB - t.ctrA);
       const avg3 = i >= 2 ? +((arr.slice(Math.max(0, i - 2), i + 1).reduce((s, x) => s + Math.abs(x.ctrB - x.ctrA), 0) / Math.min(3, i + 1)).toFixed(1)) : gap;
-      return { ep: t.ep, gap: +gap.toFixed(1), winner: t.winner, avg3 };
+      return { ep: t.ep, gap: +gap.toFixed(1), winner: t.winner, avg3, id: t.id, show: t.show, title: t.title, date: t.date };
     });
   }, [abTests]);
 
@@ -901,13 +923,16 @@ function ABTab({ abTests, abSuggestions, C: c }) {
   };
 
   const formulaStats = useMemo(() => {
-    const FORMULAS = {
-      "共感金句型": { keywords: ["共感釋放", "共感"], color: c.pink, desc: "日常OS + 後果暗示" },
-      "知識缺口型": { keywords: ["好奇懸念", "知識翻轉"], color: c.accent, desc: "熟悉場景 + 反常識" },
-      "損失轉折型": { keywords: ["損失厭惡", "背叛"], color: c.red, desc: "具體金額 + 轉折結果" },
-      "多痛點集合型": { keywords: ["多重痛點"], color: c.coral, desc: "痛點1 + 痛點2 + 痛點3" },
-    };
-    return Object.entries(FORMULAS).map(([name, { keywords, color, desc }]) => {
+    const PALETTE = [c.pink, c.accent, c.red, c.coral, c.teal, c.purple, c.green, c.blue];
+    const defs = formulaDefs?.length > 0
+      ? formulaDefs.map((f, i) => ({ ...f, color: PALETTE[i % PALETTE.length] }))
+      : [
+          { name: "共感金句型", keywords: ["共感釋放", "共感"], color: c.pink, desc: "日常OS + 後果暗示" },
+          { name: "知識缺口型", keywords: ["好奇懸念", "知識翻轉"], color: c.accent, desc: "熟悉場景 + 反常識" },
+          { name: "損失轉折型", keywords: ["損失厭惡", "背叛"], color: c.red, desc: "具體金額 + 轉折結果" },
+          { name: "多痛點集合型", keywords: ["多重痛點"], color: c.coral, desc: "痛點1 + 痛點2 + 痛點3" },
+        ];
+    return defs.map(({ name, keywords, color, desc }) => {
       const matched = abTests.filter(t => {
         const allFrames = `${t.mainFrameA || ""} ${t.frameA || ""} ${t.mainFrameB || ""} ${t.frameB || ""}`.toLowerCase();
         return keywords.some(k => allFrames.includes(k.toLowerCase()));
@@ -918,7 +943,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
       });
       return { name, color, desc, count: matched.length, wins: wins.length, winRate: matched.length > 0 ? Math.round(wins.length / matched.length * 100) : 0 };
     });
-  }, [abTests]);
+  }, [abTests, formulaDefs]);
 
   return (<div>
     {/* KPI row */}
@@ -931,14 +956,24 @@ function ABTab({ abTests, abSuggestions, C: c }) {
     </div>
 
     {/* AB Test Trend */}
-    <Section title="AB 測試趨勢" sub="CTR 差距隨實驗累積的變化">
+    <Section title="AB 測試趨勢" sub="依上架時間排序 ・ CTR 差距隨實驗累積的變化">
       <Card C={c}>
         <ResponsiveContainer width="100%" height={250}>
           <ComposedChart data={trendData}>
             <CartesianGrid strokeDasharray="3 3" stroke={c.border} />
             <XAxis dataKey="ep" stroke={c.textDim} fontSize={10} />
             <YAxis stroke={c.textDim} fontSize={11} unit="%" />
-            <Tooltip contentStyle={TT(c)} formatter={(v, name) => `${v}%`} />
+            <Tooltip content={({ active, payload }) => {
+              if (!active || !payload?.[0]) return null;
+              const d = payload[0].payload;
+              return <div style={{ ...TT(c), padding: "10px 12px", maxWidth: 260, pointerEvents: "none" }}>
+                {d.id && <img src={`https://i.ytimg.com/vi/${d.id}/mqdefault.jpg`} alt="" style={{ width: "100%", borderRadius: 4, marginBottom: 8, display: "block" }} onError={e => { e.target.style.display = "none"; }} />}
+                <div style={{ fontSize: 11, color: c.textDim, marginBottom: 2 }}>{d.show} · {d.ep}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: c.text, marginBottom: 4, whiteSpace: "normal", lineHeight: 1.4 }}>{d.title}</div>
+                {d.date && <div style={{ fontSize: 10, color: c.textDim, marginBottom: 6 }}>上架：{d.date}</div>}
+                <div style={{ fontSize: 11 }}>CTR 差距：<strong style={{ color: d.winner === "A" ? c.coral : c.green }}>{d.gap}%</strong>（{d.winner} 版勝）</div>
+              </div>;
+            }} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <Bar dataKey="gap" name="CTR 差距" radius={[4, 4, 0, 0]} barSize={24}>
               {trendData.map((d, i) => <Cell key={i} fill={d.winner === "A" ? c.coral : c.green} />)}
@@ -1003,6 +1038,10 @@ function ABTab({ abTests, abSuggestions, C: c }) {
     <Section title="每次測試詳情" sub="點擊欄位標題排序 ・ 點「更多分析」展開詳細說明">
       {/* Filter Bar */}
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 14, alignItems: "flex-end" }}>
+        <div style={{ flex: "1 1 180px" }}>
+          <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 4, letterSpacing: "0.04em" }}>關鍵字搜尋</div>
+          <input value={abKeyword} onChange={e => setAbKeyword(e.target.value)} placeholder="集數、文案、結論…" style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "5px 10px", fontSize: 12, color: c.text, width: "100%", outline: "none", fontFamily: "'Noto Sans TC', sans-serif", boxSizing: "border-box" }} />
+        </div>
         <div>
           <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 4, letterSpacing: "0.04em" }}>節目</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -1061,6 +1100,10 @@ function ABTab({ abTests, abSuggestions, C: c }) {
           if (abWinnerFilter !== "全部") {
             if (abWinnerFilter === "A版勝" && t.winner !== "A") return false;
             if (abWinnerFilter === "B版勝" && t.winner !== "B") return false;
+          }
+          if (abKeyword.trim()) {
+            const kw = abKeyword.toLowerCase().trim();
+            if (!`${t.ep} ${t.show} ${t.title} ${t.copyA} ${t.copyB} ${t.conclusion} ${t.suggestion} ${t.testVar}`.toLowerCase().includes(kw)) return false;
           }
           return true;
         }).map(t => ({ ...t, gap: +(t.ctrB - t.ctrA).toFixed(1) }))}
@@ -3623,12 +3666,12 @@ export default function App() {
       .catch(() => setReachData({}));
   }, []);
 
-  const { fullVideos, abTests, abSuggestions, formulaConfig, recordTime } = useMemo(() => {
-    if (!rawData) return { fullVideos: [], abTests: [], abSuggestions: [], formulaConfig: {}, recordTime: "" };
+  const { fullVideos, abTests, abSuggestions, formulaConfig, formulaDefs, recordTime } = useMemo(() => {
+    if (!rawData) return { fullVideos: [], abTests: [], abSuggestions: [], formulaConfig: {}, formulaDefs: [], recordTime: "" };
     const cfg = rawData.formulaConfig || {};
     const all = processVideos(rawData.videos || [], cfg);
     const full = all.filter(v => v.type === "完整集");
-    return { fullVideos: full, abTests: rawData.abTests || [], abSuggestions: rawData.abSuggestions || [], formulaConfig: cfg, recordTime: rawData.recordTime || "" };
+    return { fullVideos: full, abTests: rawData.abTests || [], abSuggestions: rawData.abSuggestions || [], formulaConfig: cfg, formulaDefs: rawData.formulaDefs || [], recordTime: rawData.recordTime || "" };
   }, [rawData]);
 
   const filteredVideos = useMemo(() => {
@@ -3739,7 +3782,7 @@ export default function App() {
         {tab === 0 && <OverviewTab fullVideos={filteredVideos} C={c} />}
         {tab === 1 && <CommercialTab fullVideos={filteredVideos} formulaConfig={formulaConfig} C={c} />}
         {tab === 2 && <TopicTab fullVideos={filteredVideos} C={c} />}
-        {tab === 3 && <ABTab abTests={abTests} abSuggestions={abSuggestions} C={c} />}
+        {tab === 3 && <ABTab abTests={abTests} abSuggestions={abSuggestions} formulaDefs={formulaDefs} C={c} />}
         {tab === 4 && <TATab fullVideos={filteredVideos} selectedShow={show} C={c} />}
         {tab === 5 && <GuestTab fullVideos={filteredVideos} C={c} />}
         {tab === 6 && <RevenueTab fullVideos={filteredVideos} C={c} />}
