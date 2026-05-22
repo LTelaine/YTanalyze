@@ -284,9 +284,11 @@ function SortableTable({ headers, dataKeys, data, renderRow, C, defaultSortKey, 
 }
 
 // ── Shared components ──
-function KPI({ label, value, sub, color, C: c, title }) {
+function KPI({ label, value, sub, color, C: c, title, onClick }) {
   const inner = (
-    <div style={{ background: c.card, borderRadius: 10, padding: "18px 20px", border: `1px solid ${c.border}`, flex: "1 1 140px", minWidth: 140 }}>
+    <div onClick={onClick} style={{ background: c.card, borderRadius: 10, padding: "18px 20px", border: `1px solid ${c.border}`, flex: "1 1 140px", minWidth: 140, cursor: onClick ? "pointer" : "default", transition: "box-shadow 0.15s" }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.boxShadow = `0 0 0 2px ${(color || c.accent)}55`; }}
+      onMouseLeave={e => { if (onClick) e.currentTarget.style.boxShadow = "none"; }}>
       <div style={{ color: c.textMuted, fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
       <div style={{ color: color || c.text, fontSize: 26, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
       {sub && <div style={{ color: c.textDim, fontSize: 11, marginTop: 4 }}>{sub}</div>}
@@ -879,7 +881,10 @@ function ABListModal({ tests, title, onClose, C: c }) {
           {(tests || []).map((t, i) => (
             <div key={`${t.ep}-${i}`} style={{ borderBottom: i < tests.length - 1 ? `1px solid ${c.border}` : "none", paddingBottom: i < tests.length - 1 ? 20 : 0 }}>
               {t.id && <img src={`https://img.youtube.com/vi/${t.id}/mqdefault.jpg`} alt="" style={{ width: "100%", borderRadius: 8, display: "block", marginBottom: 10 }} onError={e => { e.target.style.display = "none"; }} />}
-              <div style={{ fontSize: 11, color: c.textDim, marginBottom: 2 }}>{t.show} · {t.ep}{t.date ? ` · ${t.date}` : ""}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                <span style={{ background: c.accent + "20", color: c.accent, borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 10, flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: 11, color: c.textDim }}>{t.show} · {t.ep}{t.date ? ` · ${t.date}` : ""}</span>
+              </div>
               <div style={{ fontSize: 13, fontWeight: 600, color: c.text, marginBottom: 10, lineHeight: 1.4 }}>{t.title}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ background: c.green + "12", border: `1px solid ${c.green}30`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text }}><span style={{ color: c.green, fontWeight: 600, marginRight: 6 }}>A</span>{t.copyA}</div>
@@ -999,11 +1004,16 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
   return (<div>
     {/* KPI row */}
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-      <KPI label="總測試次數" value={abTests.length} C={c} title={abTests.map(t => `▸ ${t.show} ${t.ep}｜${t.title}`).join("\n")} />
-      <KPI label="B 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "B").length / abTests.length * 100)}%`} color={c.green} C={c} title={`B 勝出：\n${abTests.filter(t => t.winner === "B").map(t => `▸ ${t.show} ${t.ep}｜${t.title}`).join("\n")}`} />
-      <KPI label="A 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "A").length / abTests.length * 100)}%`} color={c.coral} C={c} title={`A 勝出：\n${abTests.filter(t => t.winner === "A").map(t => `▸ ${t.show} ${t.ep}｜${t.title}`).join("\n")}`} />
-      <KPI label="平均 CTR 差距" value={`${(abTests.reduce((a, t) => a + Math.abs(t.ctrB - t.ctrA), 0) / abTests.length).toFixed(1)}%`} color={c.accent} C={c} title={abTests.map(t => `▸ ${t.show} ${t.ep}｜${t.title}: ${Math.abs(t.ctrB - t.ctrA).toFixed(1)}%`).join("\n")} />
-      <KPI label="最大 CTR 差距" value={`${Math.max(...abTests.map(t => Math.abs(t.ctrB - t.ctrA))).toFixed(1)}%`} sub={(() => { const t = abTests.reduce((a, b) => Math.abs(b.ctrB - b.ctrA) > Math.abs(a.ctrB - a.ctrA) ? b : a); return `${t.show} ${t.ep}`; })()} color={c.coral} C={c} />
+      <KPI label="總測試次數" value={abTests.length} C={c}
+        onClick={() => setModalData({ tests: abTests, title: `全部 AB 測試（${abTests.length} 筆）` })} />
+      <KPI label="B 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "B").length / abTests.length * 100)}%`} color={c.green} C={c}
+        onClick={() => { const ts = abTests.filter(t => t.winner === "B"); setModalData({ tests: ts, title: `B 版勝出（${ts.length} 筆）` }); }} />
+      <KPI label="A 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "A").length / abTests.length * 100)}%`} color={c.coral} C={c}
+        onClick={() => { const ts = abTests.filter(t => t.winner === "A"); setModalData({ tests: ts, title: `A 版勝出（${ts.length} 筆）` }); }} />
+      <KPI label="平均 CTR 差距" value={`${(abTests.reduce((a, t) => a + Math.abs(t.ctrB - t.ctrA), 0) / abTests.length).toFixed(1)}%`} color={c.accent} C={c}
+        onClick={() => setModalData({ tests: [...abTests].sort((a, b) => Math.abs(b.ctrB - b.ctrA) - Math.abs(a.ctrB - a.ctrA)), title: `CTR 差距排行（${abTests.length} 筆）` })} />
+      <KPI label="最大 CTR 差距" value={`${Math.max(...abTests.map(t => Math.abs(t.ctrB - t.ctrA))).toFixed(1)}%`} sub={(() => { const t = abTests.reduce((a, b) => Math.abs(b.ctrB - b.ctrA) > Math.abs(a.ctrB - a.ctrA) ? b : a); return `${t.show} ${t.ep}`; })()} color={c.coral} C={c}
+        onClick={() => { const t = abTests.reduce((a, b) => Math.abs(b.ctrB - b.ctrA) > Math.abs(a.ctrB - a.ctrA) ? b : a); setModalData({ tests: [t], title: "最大 CTR 差距" }); }} />
     </div>
 
     {/* AB Test Trend */}
