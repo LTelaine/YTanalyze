@@ -3334,6 +3334,7 @@ function DiagnosisSlides({ allVideos, allAbTests, reachData, formulaConfig, star
 // ── Main ──
 export default function App() {
   const [tab, setTab] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [show, setShow] = useState("全部");
   const [isDark, setIsDark] = useState(false);
   const [fontSize, setFontSize] = useState("medium");
@@ -3429,15 +3430,48 @@ export default function App() {
             <ThemeSwitch isDark={isDark} toggle={() => setIsDark(!isDark)} C={c} />
           </div>
         </div>
-        <div style={{ display: "flex", gap: 0, overflowX: "auto" }}>
-          {TABS.map((t, i) => (
-            <button key={t} onClick={() => setTab(i)} style={{
+        <div style={{ display: "flex", gap: 0, alignItems: "center" }}>
+          {[0, 3].map(i => (
+            <button key={TABS[i]} onClick={() => setTab(i)} style={{
               background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 13,
               fontWeight: tab === i ? 600 : 400, color: tab === i ? c.accent : c.textMuted,
               borderBottom: tab === i ? `2px solid ${c.accent}` : "2px solid transparent",
               whiteSpace: "nowrap", fontFamily: "'Noto Sans TC', sans-serif", transition: "color 0.2s",
-            }}>{t}</button>
+            }}>{TABS[i]}</button>
           ))}
+          <div style={{ marginLeft: "auto", position: "relative" }}>
+            <button onClick={() => setMoreOpen(!moreOpen)} style={{
+              background: [1,2,4,5,6,7,8].includes(tab) ? c.accent + "18" : "none",
+              border: `1px solid ${[1,2,4,5,6,7,8].includes(tab) ? c.accent : c.border}`,
+              borderRadius: 6, cursor: "pointer", padding: "7px 14px", fontSize: 12,
+              color: [1,2,4,5,6,7,8].includes(tab) ? c.accent : c.textMuted,
+              fontFamily: "'Noto Sans TC', sans-serif", transition: "all 0.2s", whiteSpace: "nowrap",
+              fontWeight: [1,2,4,5,6,7,8].includes(tab) ? 600 : 400,
+            }}>
+              {[1,2,4,5,6,7,8].includes(tab) ? TABS[tab] : "更多內容"} ▾
+            </button>
+            {moreOpen && (
+              <>
+                <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }} />
+                <div style={{
+                  position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 100,
+                  background: c.card, border: `1px solid ${c.border}`, borderRadius: 8,
+                  boxShadow: `0 8px 24px rgba(0,0,0,${c.bg === "#08080A" ? "0.5" : "0.15"})`,
+                  minWidth: 150, overflow: "hidden",
+                }}>
+                  {[1,2,4,5,6,7,8].map(i => (
+                    <button key={TABS[i]} onClick={() => { setTab(i); setMoreOpen(false); }} style={{
+                      display: "block", width: "100%", textAlign: "left",
+                      background: tab === i ? c.accent + "15" : "none",
+                      border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 12,
+                      color: tab === i ? c.accent : c.text, fontWeight: tab === i ? 600 : 400,
+                      fontFamily: "'Noto Sans TC', sans-serif", transition: "background 0.15s",
+                    }}>{TABS[i]}</button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
       </div>
