@@ -303,8 +303,8 @@ function Tag({ text, color, C: c }) {
   return <span style={{ background: (color || c.accent) + "15", color: color || c.accent, fontSize: 10, padding: "2px 8px", borderRadius: 12, fontWeight: 500, border: `1px solid ${(color || c.accent)}25` }}>{text}</span>;
 }
 
-function Card({ children, style: s, C: c }) {
-  return <div style={{ background: c.card, borderRadius: 10, padding: 20, border: `1px solid ${c.border}`, ...s }}>{children}</div>;
+function Card({ children, style: s, C: c, ...rest }) {
+  return <div style={{ background: c.card, borderRadius: 10, padding: 20, border: `1px solid ${c.border}`, ...s }} {...rest}>{children}</div>;
 }
 
 const TT = (c) => ({ background: c.card, border: `1px solid ${c.border}`, borderRadius: 8, color: c.text, fontSize: 12 });
@@ -862,17 +862,21 @@ const FALLBACK_AB_TESTS = [
   { ep:"EP17", show:"防詐特攻隊", topic:"法律與社會案件", copyA:"被詐騙千萬的自救指南", copyB:"堪比八點檔！遭閨密背叛、慘被詐騙千萬", ctrA:5.3, ctrB:8.4, winner:"B", frameA:"實用承諾", frameB:"情感共鳴", testVar:"混合", angleA:"教學自救", angleB:"八點檔故事", conclusion:"「堪比八點檔」的故事張力 + 背叛元素引發強烈情感共鳴，CTR 差距最大（3.1%）", suggestion:"真實故事型防詐影片用戲劇化包裝，CTR 天花板最高" },
 ];
 
-// ── AB List Modal ──
+// ── AB List Modal (slide panel from right) ──
 function ABListModal({ tests, title, onClose, C: c }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => { requestAnimationFrame(() => setOpen(true)); }, []);
+  const handleClose = () => { setOpen(false); setTimeout(onClose, 300); };
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: c.card, borderRadius: 14, padding: 24, width: "min(580px, 92vw)", maxHeight: "82vh", overflowY: "auto", boxShadow: "0 24px 60px rgba(0,0,0,0.4)", border: `1px solid ${c.border}` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 16, color: c.text }}>{title}</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: c.textMuted, fontSize: 20, lineHeight: 1, padding: "0 4px" }}>✕</button>
+    <>
+      <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 7999, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)", opacity: open ? 1 : 0, transition: "opacity 0.3s ease" }} />
+      <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(420px, 92vw)", zIndex: 8000, background: c.card, borderLeft: `1px solid ${c.border}`, boxShadow: "-8px 0 32px rgba(0,0,0,0.25)", overflowY: "auto", transform: open ? "translateX(0)" : "translateX(100%)", transition: "transform 0.3s ease" }}>
+        <div style={{ position: "sticky", top: 0, background: c.card, borderBottom: `1px solid ${c.border}`, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: c.text }}>{title}</div>
+          <button onClick={handleClose} style={{ background: "none", border: "none", cursor: "pointer", color: c.textMuted, fontSize: 20, lineHeight: 1, padding: "0 4px" }}>✕</button>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {tests.map((t, i) => (
+        <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 20 }}>
+          {(tests || []).map((t, i) => (
             <div key={`${t.ep}-${i}`} style={{ borderBottom: i < tests.length - 1 ? `1px solid ${c.border}` : "none", paddingBottom: i < tests.length - 1 ? 20 : 0 }}>
               {t.id && <img src={`https://img.youtube.com/vi/${t.id}/mqdefault.jpg`} alt="" style={{ width: "100%", borderRadius: 8, display: "block", marginBottom: 10 }} onError={e => { e.target.style.display = "none"; }} />}
               <div style={{ fontSize: 11, color: c.textDim, marginBottom: 2 }}>{t.show} · {t.ep}{t.date ? ` · ${t.date}` : ""}</div>
@@ -885,7 +889,7 @@ function ABListModal({ tests, title, onClose, C: c }) {
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
