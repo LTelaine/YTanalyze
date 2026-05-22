@@ -457,12 +457,13 @@ function WidthSwitch({ isFullWidth, toggle, C: c }) {
 }
 
 // ── Channel Funnel ──
-function ChannelFunnel({ fullVideos, C: c }) {
+function ChannelFunnel({ fullVideos, reachData = {}, C: c }) {
   const totalViews = fullVideos.reduce((a, v) => a + v.views, 0);
   const totalSubs = Math.max(fullVideos.reduce((a, v) => a + v.subs, 0), 0);
-  const hasImpressions = false;
+  const totalImpressions = fullVideos.reduce((a, v) => a + (reachData[v.id]?.impressions || 0), 0);
+  const hasImpressions = totalImpressions > 0;
   const layers = hasImpressions
-    ? [{ label: "曝光次數", value: 0, color: c.blue }, { label: "觀看次數", value: totalViews, color: c.accent }, { label: "訂閱增長", value: totalSubs, color: c.green }]
+    ? [{ label: "曝光次數", value: totalImpressions, color: c.blue }, { label: "觀看次數", value: totalViews, color: c.accent }, { label: "訂閱增長", value: totalSubs, color: c.green }]
     : [{ label: "觀看次數", value: totalViews, color: c.accent }, { label: "訂閱增長", value: totalSubs, color: c.green }];
   const maxVal = layers[0].value || 1;
 
@@ -541,7 +542,7 @@ function MonthlyTrend({ fullVideos, C: c }) {
 }
 
 // ── Tab: Overview ──
-function OverviewTab({ fullVideos, C: c }) {
+function OverviewTab({ fullVideos, reachData, C: c }) {
   const total = fullVideos.reduce((a, v) => ({ views: a.views + v.views, subs: a.subs + v.subs }), { views: 0, subs: 0 });
   const avgCIdx = (fullVideos.reduce((a, v) => a + v.commercialIdx, 0) / fullVideos.length).toFixed(1);
 
@@ -635,7 +636,7 @@ function OverviewTab({ fullVideos, C: c }) {
         )}
       />
     </Section>
-    <ChannelFunnel fullVideos={fullVideos} C={c} />
+    <ChannelFunnel fullVideos={fullVideos} reachData={reachData} C={c} />
     <MonthlyTrend fullVideos={fullVideos} C={c} />
   </div>);
 }
@@ -3918,7 +3919,7 @@ export default function App() {
       </div>
       </div>
       <div style={{ padding: "20px 28px 60px", maxWidth: isFullWidth ? "none" : 1100, margin: isFullWidth ? 0 : "0 auto", transition: "all 0.3s" }}>
-        {tab === 0 && <OverviewTab fullVideos={filteredVideos} C={c} />}
+        {tab === 0 && <OverviewTab fullVideos={filteredVideos} reachData={reachData} C={c} />}
         {tab === 1 && <CommercialTab fullVideos={filteredVideos} formulaConfig={formulaConfig} C={c} />}
         {tab === 2 && <TopicTab fullVideos={filteredVideos} C={c} />}
         {tab === 3 && <ABTab abTests={abTests} abSuggestions={abSuggestions} formulaDefs={formulaDefs} C={c} />}
