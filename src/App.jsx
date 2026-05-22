@@ -836,6 +836,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
     return Object.entries(map).map(([title, items]) => ({ title, items, color: BLOCK_COLORS[title] || c.accent }));
   }, [abSuggestions]);
   const [expandedRow, setExpandedRow] = useState(null);
+  const [checklistOpen, setChecklistOpen] = useState(false);
 
   // Stats by test variable
   const varStats = useMemo(() => {
@@ -864,9 +865,77 @@ function ABTab({ abTests, abSuggestions, C: c }) {
     return Object.values(map).map(f => ({ ...f, avgCTR: +(f.totalCTR / f.count).toFixed(1), winRate: Math.round(f.wins / f.count * 100) })).sort((a, b) => b.winRate - a.winRate);
   }, []);
 
-  const frameColorMap = { "好奇懸念": c.accent, "恐懼損失": c.red, "實用承諾": c.blue, "權威背書": c.purple, "情感共鳴": c.pink, "社會認同": c.teal };
+  const frameColorMap = { "好奇懸念": c.accent, "恐懼損失": c.red, "實用承諾": c.blue, "權威背書": c.purple, "情感共鳴": c.pink, "社會認同": c.teal, "損失厭惡": c.red, "恐懼訴求": c.coral, "權威解答": c.purple, "權威揭密": c.purple, "利益驅動": c.teal, "共感釋放": c.pink };
+
+  const VAR_CONCLUSIONS = {
+    "結尾鉤子": { conclusion: "反常識 > 權威背書；背叛感 > 真假反差", confidence: "累積中", color: c.accent },
+    "懸念類型": { conclusion: "知識翻轉 > 靈異獵奇", confidence: "需再測", color: c.coral },
+    "資訊密度": { conclusion: "多痛點 >> 單一深入（差距62.4%）", confidence: "穩固", color: c.green },
+    "開頭語氣": { conclusion: "直述 > 質問（差距28%）", confidence: "穩固", color: c.green },
+    "是否加入篩選條件": { conclusion: "不加 > 加（差距7%）", confidence: "穩固", color: c.green },
+    "敘事結構": { conclusion: "懸念問句 > 戲劇形容", confidence: "需再測", color: c.coral },
+    "利益呈現方式": { conclusion: "收入金額 > 效率倍數（差距小）", confidence: "需再測", color: c.coral },
+    "情緒調性": { conclusion: "正向共感 >> 反差質問（差距59%）", confidence: "穩固", color: c.green },
+    "議題定位": { conclusion: "自我認識 > 關係問題", confidence: "需再測", color: c.coral },
+    "敘事策略": { conclusion: "失敗轉折 > 佛系認同", confidence: "需再測", color: c.coral },
+    "切入角度": { conclusion: "痛點共鳴 > 方法論（差距30%）", confidence: "穩固", color: c.green },
+    "框架方向": { conclusion: "正向解方 > 負向警告（差距小）", confidence: "需再測", color: c.coral },
+    "恐懼來源": { conclusion: "知識落差 > 直接威脅", confidence: "需再測", color: c.coral },
+    "恐懼類型": { conclusion: "原因懸念 > 結果衝擊", confidence: "需再測", color: c.coral },
+  };
+
+  const formulaStats = useMemo(() => {
+    const FORMULAS = {
+      "共感金句型": { keywords: ["共感釋放", "共感"], color: c.pink, desc: "日常OS + 後果暗示" },
+      "知識缺口型": { keywords: ["好奇懸念", "知識翻轉"], color: c.accent, desc: "熟悉場景 + 反常識" },
+      "損失轉折型": { keywords: ["損失厭惡", "背叛"], color: c.red, desc: "具體金額 + 轉折結果" },
+      "多痛點集合型": { keywords: ["多重痛點"], color: c.coral, desc: "痛點1 + 痛點2 + 痛點3" },
+    };
+    return Object.entries(FORMULAS).map(([name, { keywords, color, desc }]) => {
+      const matched = abTests.filter(t => {
+        const allFrames = `${t.mainFrameA || ""} ${t.frameA || ""} ${t.mainFrameB || ""} ${t.frameB || ""}`.toLowerCase();
+        return keywords.some(k => allFrames.includes(k.toLowerCase()));
+      });
+      const wins = matched.filter(t => {
+        const winnerFrame = t.winner === "A" ? `${t.mainFrameA || ""} ${t.frameA || ""}` : `${t.mainFrameB || ""} ${t.frameB || ""}`;
+        return keywords.some(k => winnerFrame.toLowerCase().includes(k.toLowerCase()));
+      });
+      return { name, color, desc, count: matched.length, wins: wins.length, winRate: matched.length > 0 ? Math.round(wins.length / matched.length * 100) : 0 };
+    });
+  }, [abTests]);
 
   return (<div>
+    {/* Checklist Panel */}
+    <Card C={c} style={{ marginBottom: 14 }}>
+      <div onClick={() => setChecklistOpen(!checklistOpen)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: c.text }}>文案寫作 Checklist</div>
+        <span style={{ fontSize: 11, color: c.textMuted }}>{checklistOpen ? "▲ 收起" : "▼ 展開"}</span>
+      </div>
+      {checklistOpen && (
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+          {[
+            "有沒有「就是在說我」的共感入口？",
+            "是否只測一個變數？（其他條件一致）",
+            "有沒有避開質問語氣（「你想___？」）？",
+            "有沒有避開年齡/身份篩選詞？",
+            "如果用恐懼，有沒有搭配資訊缺口或出路？",
+            "如果用金額，是具體數字還是抽象倍數？",
+            "方法論名詞有沒有太早揭露？",
+            "健康題材有沒有用多痛點策略？",
+            "整體調性是溫暖共感還是冷硬恐嚇？（偏前者）",
+            "能不能讓 45–64 歲的觀眾看 0.5 秒就覺得「跟我有關」？",
+            "用語有沒有太年輕化？（45–64 歲佔 57%）",
+            "在手機小螢幕上能不能一眼看完？（58% 手機觀看）",
+          ].map((item, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <span style={{ color: c.accent, fontSize: 8, marginTop: 5 }}>●</span>
+              <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6 }}>{item}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+
     {/* KPI row */}
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
       <KPI label="總測試次數" value={abTests.length} C={c} title={abTests.map(t => `${t.show} ${t.ep}｜${t.title}`).join("\n")} />
@@ -893,7 +962,34 @@ function ABTab({ abTests, abSuggestions, C: c }) {
               <span style={{ color: c.textMuted, fontSize: 11 }}>B 版勝出</span>
               <span style={{ color: c.green, fontFamily: "'JetBrains Mono', monospace" }}>{v.wins.B}/{v.count}</span>
             </div>
+            {VAR_CONCLUSIONS[v.type] && <>
+              <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${c.border}` }}>
+                <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 4 }}>已驗證結論</div>
+                <div style={{ fontSize: 11, color: c.text, lineHeight: 1.4 }}>{VAR_CONCLUSIONS[v.type].conclusion}</div>
+                <span style={{ display: "inline-block", marginTop: 6, fontSize: 9, padding: "2px 8px", borderRadius: 10, fontWeight: 600, background: VAR_CONCLUSIONS[v.type].color + "18", color: VAR_CONCLUSIONS[v.type].color }}>{VAR_CONCLUSIONS[v.type].confidence}</span>
+              </div>
+            </>}
           </Card></ABCardTip>
+        ))}
+      </div>
+    </Section>
+
+    {/* Formula Types Analysis */}
+    <Section title="四大文案公式" sub="共感金句型 ・ 知識缺口型 ・ 損失轉折型 ・ 多痛點集合型">
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {formulaStats.map(f => (
+          <Card key={f.name} C={c} style={{ flex: "1 1 180px", minWidth: 170, borderLeft: `3px solid ${f.color}` }}>
+            <div style={{ color: f.color, fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{f.name}</div>
+            <div style={{ color: c.textDim, fontSize: 10, marginBottom: 10 }}>{f.desc}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ color: c.textMuted, fontSize: 11 }}>出現次數</span>
+              <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{f.count}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ color: c.textMuted, fontSize: 11 }}>勝率</span>
+              <span style={{ color: f.winRate >= 50 ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{f.winRate}%</span>
+            </div>
+          </Card>
         ))}
       </div>
     </Section>
@@ -926,6 +1022,24 @@ function ABTab({ abTests, abSuggestions, C: c }) {
       </div>
     </Section>
 
+    {/* Cumulative Framework Analysis */}
+    <Section title="累積情緒框架分析" sub="各框架使用次數與勝率對照">
+      <Card C={c}>
+        <ResponsiveContainer width="100%" height={300}>
+          <ComposedChart data={frameStats}>
+            <CartesianGrid strokeDasharray="3 3" stroke={c.border} />
+            <XAxis dataKey="frame" stroke={c.textDim} fontSize={10} />
+            <YAxis yAxisId="left" stroke={c.accent} fontSize={11} label={{ value: "使用次數", angle: -90, position: "insideLeft", fill: c.textMuted, fontSize: 11 }} />
+            <YAxis yAxisId="right" orientation="right" stroke={c.green} fontSize={11} domain={[0, 100]} label={{ value: "勝率 %", angle: 90, position: "insideRight", fill: c.textMuted, fontSize: 11 }} />
+            <Tooltip contentStyle={TT(c)} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar yAxisId="left" dataKey="count" name="使用次數" fill={c.accent} radius={[4, 4, 0, 0]} barSize={30} />
+            <Bar yAxisId="right" dataKey="winRate" name="勝率 %" fill={c.green} radius={[4, 4, 0, 0]} barSize={30} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </Card>
+    </Section>
+
     {/* AB Test Detail Table */}
     <Section title="每次測試詳情" sub="點擊欄位標題排序 ・ 點「更多分析」展開詳細說明">
       <SortableTable C={c}
@@ -940,8 +1054,8 @@ function ABTab({ abTests, abSuggestions, C: c }) {
               <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500 }}><VideoPreviewTip id={t.id} title={t.title} date={t.date} C={c}>{t.ep}</VideoPreviewTip></td>
               <td style={{ padding: "12px 14px" }}><Tag text={t.show} color={c.colors6[SHOWS.indexOf(t.show) % 6]} C={c} /></td>
               <td style={{ padding: "12px 14px" }}><Tip text={`${t.testVarDesc ? `${t.testVar}：${t.testVarDesc}\n\n` : ""}A: ${t.topicAngleA || t.angleA || t.frameA}\nB: ${t.topicAngleB || t.angleB || t.frameB}`} C={c} inline><Tag text={t.testVar} color={t.testVar === "情緒框架" ? c.purple : t.testVar === "議題包裝" ? c.teal : c.coral} C={c} /></Tip></td>
-              <td style={{ padding: "12px 14px", color: t.winner === "A" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Tip text={t.copyA} C={c} inline>{t.copyA}</Tip></td>
-              <td style={{ padding: "12px 14px", color: t.winner === "B" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Tip text={t.copyB} C={c} inline>{t.copyB}</Tip></td>
+              <td style={{ padding: "12px 14px", color: t.winner === "A" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Tip text={t.topicAngleA || t.copyA} C={c} inline>{t.copyA}</Tip></td>
+              <td style={{ padding: "12px 14px", color: t.winner === "B" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Tip text={t.topicAngleB || t.copyB} C={c} inline>{t.copyB}</Tip></td>
               <td style={{ padding: "12px 14px", minWidth: 160 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -979,18 +1093,20 @@ function ABTab({ abTests, abSuggestions, C: c }) {
                     <div style={{ fontSize: 12, fontWeight: 600, color: c.text, marginBottom: 14 }}>{t.ep} AB 分析</div>
                     <div style={{ display: "flex", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
                       <div style={{ flex: "1 1 200px", padding: 12, background: t.winner === "A" ? c.green + "12" : c.card, borderRadius: 8, border: `1px solid ${t.winner === "A" ? c.green + "40" : c.border}` }}>
-                        <div style={{ fontSize: 10, color: c.textDim, marginBottom: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <span>版本 A・{t.frameA}</span>
-                          {t.topicAngleA && <span style={{ color: c.accent, background: c.accent + "15", padding: "1px 6px", borderRadius: 4 }}>{t.topicAngleA}</span>}
+                        <div style={{ fontSize: 10, color: c.textDim, marginBottom: 6 }}>版本 A{t.winner === "A" ? " ✓" : ""}</div>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+                          {t.mainFrameA && <Tag text={t.mainFrameA} color={frameColorMap[t.mainFrameA] || c.accent} C={c} />}
+                          {(t.frameA || "").split(",").filter(f => f.trim() && f.trim() !== t.mainFrameA).map(f => <Tag key={f} text={f.trim()} color={c.textDim} C={c} />)}
                         </div>
                         <div style={{ fontSize: 12, color: c.text, marginBottom: 8, lineHeight: 1.5 }}>{t.copyA}</div>
                         {t.angleA && <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 8 }}>設計脈絡：{t.angleA}</div>}
                         <div style={{ fontSize: 18, fontWeight: 700, color: t.winner === "A" ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{t.ctrA}%</div>
                       </div>
                       <div style={{ flex: "1 1 200px", padding: 12, background: t.winner === "B" ? c.green + "12" : c.card, borderRadius: 8, border: `1px solid ${t.winner === "B" ? c.green + "40" : c.border}` }}>
-                        <div style={{ fontSize: 10, color: c.textDim, marginBottom: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <span>版本 B・{t.frameB}</span>
-                          {t.topicAngleB && <span style={{ color: c.accent, background: c.accent + "15", padding: "1px 6px", borderRadius: 4 }}>{t.topicAngleB}</span>}
+                        <div style={{ fontSize: 10, color: c.textDim, marginBottom: 6 }}>版本 B{t.winner === "B" ? " ✓" : ""}</div>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+                          {t.mainFrameB && <Tag text={t.mainFrameB} color={frameColorMap[t.mainFrameB] || c.accent} C={c} />}
+                          {(t.frameB || "").split(",").filter(f => f.trim() && f.trim() !== t.mainFrameB).map(f => <Tag key={f} text={f.trim()} color={c.textDim} C={c} />)}
                         </div>
                         <div style={{ fontSize: 12, color: c.text, marginBottom: 8, lineHeight: 1.5 }}>{t.copyB}</div>
                         {t.angleB && <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 8 }}>設計脈絡：{t.angleB}</div>}
