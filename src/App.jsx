@@ -941,7 +941,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
         const winnerFrame = t.winner === "A" ? `${t.mainFrameA || ""} ${t.frameA || ""}` : `${t.mainFrameB || ""} ${t.frameB || ""}`;
         return keywords.some(k => winnerFrame.toLowerCase().includes(k.toLowerCase()));
       });
-      return { name, color, desc, count: matched.length, wins: wins.length, winRate: matched.length > 0 ? Math.round(wins.length / matched.length * 100) : 0 };
+      return { name, color, desc, count: matched.length, wins: wins.length, winRate: matched.length > 0 ? Math.round(wins.length / matched.length * 100) : 0, eps: matched.map(t => `${t.show} ${t.ep}｜${t.title}`) };
     });
   }, [abTests, formulaDefs]);
 
@@ -1023,7 +1023,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
             <div style={{ color: c.textDim, fontSize: 10, marginBottom: 10 }}>{f.desc}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span style={{ color: c.textMuted, fontSize: 11 }}>出現次數</span>
-              <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{f.count}</span>
+              <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}><Tip text={f.eps.join("\n")} C={c} inline>{f.count}</Tip></span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: c.textMuted, fontSize: 11 }}>勝率</span>
