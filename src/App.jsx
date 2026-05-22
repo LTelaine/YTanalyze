@@ -835,7 +835,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
     });
     return Object.entries(map).map(([title, items]) => ({ title, items, color: BLOCK_COLORS[title] || c.accent }));
   }, [abSuggestions]);
-  const [expandedRow, setExpandedRow] = useState(null);
+  const [expandedRows, setExpandedRows] = useState(new Set());
   const [checklistOpen, setChecklistOpen] = useState(false);
 
   // Stats by test variable
@@ -1048,7 +1048,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
         data={abTests.map(t => ({ ...t, gap: +(t.ctrB - t.ctrA).toFixed(1) }))}
         renderRow={(t, i) => {
           const maxCTR = Math.max(t.ctrA, t.ctrB) || 1;
-          const isExpanded = expandedRow === t.ep;
+          const isExpanded = expandedRows.has(t.ep);
           return [
             <tr key={t.ep} style={{ borderBottom: isExpanded ? "none" : `1px solid ${c.border}`, background: isExpanded ? c.sortHover : "transparent", transition: "background 0.15s" }}>
               <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500 }}><VideoPreviewTip id={t.id} title={t.title} date={t.date} C={c}>{t.ep}</VideoPreviewTip></td>
@@ -1075,7 +1075,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
               <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: t.gap > 2 ? c.green : t.gap > 1 ? c.accent : c.textMuted, fontWeight: 600 }}>+{Math.abs(t.gap).toFixed(1)}%</td>
               <td style={{ padding: "12px 14px" }}><span style={{ background: c.green + "18", color: c.green, padding: "2px 10px", borderRadius: 10, fontSize: 11, fontWeight: 600 }}>{t.winner}</span></td>
               <td style={{ padding: "12px 14px" }}>
-                <button onClick={() => setExpandedRow(isExpanded ? null : t.ep)} style={{
+                <button onClick={() => setExpandedRows(prev => { const next = new Set(prev); if (next.has(t.ep)) next.delete(t.ep); else next.add(t.ep); return next; })} style={{
                   background: isExpanded ? c.accent + "18" : "none",
                   border: `1px solid ${isExpanded ? c.accent : c.border}`,
                   borderRadius: 6, color: isExpanded ? c.accent : c.textMuted,
