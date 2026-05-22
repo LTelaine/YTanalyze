@@ -862,6 +862,33 @@ const FALLBACK_AB_TESTS = [
   { ep:"EP17", show:"防詐特攻隊", topic:"法律與社會案件", copyA:"被詐騙千萬的自救指南", copyB:"堪比八點檔！遭閨密背叛、慘被詐騙千萬", ctrA:5.3, ctrB:8.4, winner:"B", frameA:"實用承諾", frameB:"情感共鳴", testVar:"混合", angleA:"教學自救", angleB:"八點檔故事", conclusion:"「堪比八點檔」的故事張力 + 背叛元素引發強烈情感共鳴，CTR 差距最大（3.1%）", suggestion:"真實故事型防詐影片用戲劇化包裝，CTR 天花板最高" },
 ];
 
+// ── AB List Modal ──
+function ABListModal({ tests, title, onClose, C: c }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: c.card, borderRadius: 14, padding: 24, width: "min(580px, 92vw)", maxHeight: "82vh", overflowY: "auto", boxShadow: "0 24px 60px rgba(0,0,0,0.4)", border: `1px solid ${c.border}` }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 16, color: c.text }}>{title}</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: c.textMuted, fontSize: 20, lineHeight: 1, padding: "0 4px" }}>✕</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {tests.map((t, i) => (
+            <div key={`${t.ep}-${i}`} style={{ borderBottom: i < tests.length - 1 ? `1px solid ${c.border}` : "none", paddingBottom: i < tests.length - 1 ? 20 : 0 }}>
+              {t.id && <img src={`https://img.youtube.com/vi/${t.id}/mqdefault.jpg`} alt="" style={{ width: "100%", borderRadius: 8, display: "block", marginBottom: 10 }} onError={e => { e.target.style.display = "none"; }} />}
+              <div style={{ fontSize: 11, color: c.textDim, marginBottom: 2 }}>{t.show} · {t.ep}{t.date ? ` · ${t.date}` : ""}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: c.text, marginBottom: 10, lineHeight: 1.4 }}>{t.title}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ background: c.green + "12", border: `1px solid ${c.green}30`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text }}><span style={{ color: c.green, fontWeight: 600, marginRight: 6 }}>A</span>{t.copyA}</div>
+                <div style={{ background: c.blue + "12", border: `1px solid ${c.blue}30`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text }}><span style={{ color: c.blue, fontWeight: 600, marginRight: 6 }}>B</span>{t.copyB}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Tab: AB ──
 function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
   const BLOCK_COLORS = { "框架策略": c.accent, "議題包裝": c.teal, "下次測試方向": c.purple };
@@ -880,6 +907,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
   const [abWinnerFilter, setAbWinnerFilter] = useState("全部");
   const [openSuggBlock, setOpenSuggBlock] = useState(null);
   const [abKeyword, setAbKeyword] = useState("");
+  const [modalData, setModalData] = useState(null);
 
   // Stats by test variable
   const varStats = useMemo(() => {
@@ -902,7 +930,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
       [{ frame: t.mainFrameA || t.frameA, ctr: t.ctrA, won: t.winner === "A", ep: t.ep, show: t.show }, { frame: t.mainFrameB || t.frameB, ctr: t.ctrB, won: t.winner === "B", ep: t.ep, show: t.show }].forEach(({ frame, ctr, won, ep, show }) => {
         if (!map[frame]) map[frame] = { frame, totalCTR: 0, count: 0, wins: 0, eps: [] };
         map[frame].totalCTR += ctr; map[frame].count++; if (won) map[frame].wins++;
-        map[frame].eps.push(`${show} ${ep}｜${t.title}`);
+        map[frame].eps.push(`▸ ${show} ${ep}｜${t.title}`);
       });
     });
     return Object.values(map).map(f => ({ ...f, avgCTR: +(f.totalCTR / f.count).toFixed(1), winRate: Math.round(f.wins / f.count * 100) })).sort((a, b) => b.winRate - a.winRate);
@@ -1018,11 +1046,12 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
             <Tooltip content={({ active, payload }) => {
               if (!active || !payload?.[0]) return null;
               const d = payload[0].payload;
-              return <div style={{ ...TT(c), padding: "8px 12px" }}>
+              return <div style={{ ...TT(c), padding: "8px 12px", maxWidth: 300 }}>
                 <div style={{ fontWeight: 600, color: frameColorMap[d.frame] || c.accent }}>{d.frame}</div>
                 <div style={{ fontSize: 11, marginTop: 4 }}>勝率：{d.winRate}%</div>
                 <div style={{ fontSize: 11 }}>平均 CTR：{d.avgCTR}%</div>
                 <div style={{ fontSize: 11 }}>使用次數：{d.count}</div>
+                {d.eps?.length > 0 && <div style={{ fontSize: 10, color: c.textDim, marginTop: 6, whiteSpace: "pre-wrap", lineHeight: 1.8, borderTop: `1px solid ${c.border}`, paddingTop: 6 }}>{d.eps.join("\n")}</div>}
               </div>;
             }} />
             <Bar dataKey="winRate" name="勝率" radius={[0, 5, 5, 0]}>
@@ -1037,20 +1066,22 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
     <Section title="四大文案公式" sub="共感金句型 ・ 知識缺口型 ・ 損失轉折型 ・ 多痛點集合型">
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {formulaStats.map(f => (
-          <ABCardTip key={f.name} tests={f.tests} C={c}>
-            <Card C={c} style={{ flex: "1 1 180px", minWidth: 170, borderLeft: `3px solid ${f.color}`, cursor: "default" }}>
-              <div style={{ color: f.color, fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{f.name}</div>
-              <div style={{ color: c.textDim, fontSize: 10, marginBottom: 10 }}>{f.desc}</div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ color: c.textMuted, fontSize: 11 }}>出現次數</span>
-                <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{f.count}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: c.textMuted, fontSize: 11 }}>勝率</span>
-                <span style={{ color: f.winRate >= 50 ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{f.winRate}%</span>
-              </div>
-            </Card>
-          </ABCardTip>
+          <Card key={f.name} C={c} style={{ flex: "1 1 180px", minWidth: 170, borderLeft: `3px solid ${f.color}`, cursor: f.tests.length > 0 ? "pointer" : "default", transition: "box-shadow 0.15s" }}
+            onClick={() => f.tests.length > 0 && setModalData({ tests: f.tests, title: `${f.name}（${f.count} 筆）` })}
+            onMouseEnter={e => { if (f.tests.length > 0) e.currentTarget.style.boxShadow = `0 0 0 2px ${f.color}55`; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; }}>
+            <div style={{ color: f.color, fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{f.name}</div>
+            <div style={{ color: c.textDim, fontSize: 10, marginBottom: 10 }}>{f.desc}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ color: c.textMuted, fontSize: 11 }}>出現次數</span>
+              <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{f.count}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ color: c.textMuted, fontSize: 11 }}>勝率</span>
+              <span style={{ color: f.winRate >= 50 ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{f.winRate}%</span>
+            </div>
+            {f.tests.length > 0 && <div style={{ fontSize: 9, color: c.textDim, marginTop: 10, textAlign: "right", letterSpacing: "0.04em" }}>點擊查看詳情 →</div>}
+          </Card>
         ))}
       </div>
     </Section>
@@ -1222,7 +1253,11 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
           return (
             <tr key={v.type} style={{ borderBottom: `1px solid ${c.border}` }}>
               <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500, fontSize: 12 }}>{v.type}</td>
-              <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.text, fontSize: 12 }}><ABCardTip tests={v.tests} C={c}><span style={{ cursor: "default" }}>{v.count}</span></ABCardTip></td>
+              <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.text, fontSize: 12 }}>
+                {v.tests.length >= 2
+                  ? <span style={{ cursor: "pointer", color: c.accent, textDecoration: "underline dotted" }} onClick={() => setModalData({ tests: v.tests, title: `${v.type}（${v.count} 筆）` })}>{v.count}</span>
+                  : <ABCardTip tests={v.tests} C={c}><span style={{ cursor: "default" }}>{v.count}</span></ABCardTip>}
+              </td>
               <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.accent, fontWeight: 600, fontSize: 12 }}>{v.avgGap}%</td>
               <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.text }}>A:{v.wins.A} B:{v.wins.B}</td>
               <td style={{ padding: "12px 14px", fontSize: 11 }}>
@@ -1320,6 +1355,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
         ))}
       </div>
     </div>
+    {modalData && <ABListModal tests={modalData.tests} title={modalData.title} onClose={() => setModalData(null)} C={c} />}
   </div>);
 }
 
