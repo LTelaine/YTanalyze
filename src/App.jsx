@@ -315,6 +315,33 @@ function VideoPreviewTip({ id, title, date, children, C: c }) {
   );
 }
 
+function ABCardTip({ tests, children, C: c }) {
+  const [pos, setPos] = useState(null);
+  return (
+    <div onMouseEnter={e => setPos({ x: e.clientX, y: e.clientY })} onMouseMove={e => setPos({ x: e.clientX, y: e.clientY })} onMouseLeave={() => setPos(null)} style={{ display: "contents" }}>
+      {children}
+      {pos && tests?.length > 0 && (
+        <div style={{
+          position: "fixed", left: Math.min(pos.x + 14, window.innerWidth - 300), top: Math.max(pos.y + 16, 10),
+          zIndex: 9999, background: c.card, border: `1px solid ${c.border}`, borderRadius: 10,
+          padding: 12, boxShadow: `0 8px 30px rgba(0,0,0,${c.bg === "#08080A" ? "0.5" : "0.15"})`,
+          pointerEvents: "none", maxWidth: 280, maxHeight: 420, overflowY: "auto",
+        }}>
+          {tests.map((t, i) => (
+            <div key={t.ep} style={{ marginBottom: i < tests.length - 1 ? 12 : 0, paddingBottom: i < tests.length - 1 ? 12 : 0, borderBottom: i < tests.length - 1 ? `1px solid ${c.border}` : "none" }}>
+              {t.id && <img src={`https://img.youtube.com/vi/${t.id}/mqdefault.jpg`} alt="" style={{ width: "100%", borderRadius: 4, display: "block" }} />}
+              <div style={{ fontSize: 11, color: c.text, marginTop: 4, fontWeight: 500, whiteSpace: "normal" }}>{t.title || `${t.show} ${t.ep}`}</div>
+              <div style={{ fontSize: 10, color: c.textMuted, marginTop: 2 }}>{t.date}</div>
+              <div style={{ fontSize: 10, marginTop: 6, color: c.green, whiteSpace: "normal" }}>A：{t.copyA}</div>
+              <div style={{ fontSize: 10, marginTop: 2, color: c.blue, whiteSpace: "normal" }}>B：{t.copyB}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VideoTitleCell({ v, C: c }) {
   const [pos, setPos] = useState(null);
   const handleEnter = (e) => setPos({ x: e.clientX, y: e.clientY });
@@ -814,11 +841,12 @@ function ABTab({ abTests, abSuggestions, C: c }) {
   const varStats = useMemo(() => {
     const map = {};
     abTests.forEach(t => {
-      if (!map[t.testVar]) map[t.testVar] = { type: t.testVar, count: 0, totalGap: 0, wins: { A: 0, B: 0 }, eps: [] };
+      if (!map[t.testVar]) map[t.testVar] = { type: t.testVar, count: 0, totalGap: 0, wins: { A: 0, B: 0 }, eps: [], tests: [] };
       map[t.testVar].count++;
       map[t.testVar].totalGap += Math.abs(t.ctrB - t.ctrA);
       map[t.testVar].wins[t.winner]++;
       map[t.testVar].eps.push(`${t.show} ${t.ep}｜${t.title}`);
+      map[t.testVar].tests.push(t);
     });
     return Object.values(map).map(v => ({ ...v, avgGap: +(v.totalGap / v.count).toFixed(1) }));
   }, []);
@@ -851,7 +879,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
     <Section title="測試變數效益分析" sub="議題包裝 vs 情緒框架 vs 混合，哪種測試方向 CTR 差距最大？">
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {varStats.map(v => (
-          <Tip key={v.type} text={v.eps.join("\n")} C={c}><Card C={c} style={{ flex: "1 1 180px", minWidth: 170 }}>
+          <ABCardTip key={v.type} tests={v.tests} C={c}><Card C={c} style={{ flex: "1 1 180px", minWidth: 170 }}>
             <div style={{ color: c.text, fontWeight: 600, fontSize: 14, marginBottom: 12 }}>{v.type}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <span style={{ color: c.textMuted, fontSize: 11 }}>測試次數</span>
@@ -865,7 +893,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
               <span style={{ color: c.textMuted, fontSize: 11 }}>B 版勝出</span>
               <span style={{ color: c.green, fontFamily: "'JetBrains Mono', monospace" }}>{v.wins.B}/{v.count}</span>
             </div>
-          </Card></Tip>
+          </Card></ABCardTip>
         ))}
       </div>
     </Section>
