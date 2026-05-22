@@ -871,7 +871,7 @@ function ABListModal({ tests, title, onClose, C: c }) {
   const handleClose = () => { setOpen(false); setTimeout(onClose, 300); };
   return (
     <>
-      <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 7999, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)", opacity: open ? 1 : 0, transition: "opacity 0.3s ease" }} />
+      <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 7999, background: "rgba(0,0,0,0.45)", opacity: open ? 1 : 0, transition: "opacity 0.3s ease" }} />
       <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(420px, 92vw)", zIndex: 8000, background: c.card, borderLeft: `1px solid ${c.border}`, boxShadow: "-8px 0 32px rgba(0,0,0,0.25)", overflowY: "auto", transform: open ? "translateX(0)" : "translateX(100%)", transition: "transform 0.3s ease" }}>
         <div style={{ position: "sticky", top: 0, background: c.card, borderBottom: `1px solid ${c.border}`, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 15, color: c.text }}>{title}</div>
@@ -882,13 +882,25 @@ function ABListModal({ tests, title, onClose, C: c }) {
             <div key={`${t.ep}-${i}`} style={{ borderBottom: i < tests.length - 1 ? `1px solid ${c.border}` : "none", paddingBottom: i < tests.length - 1 ? 20 : 0 }}>
               {t.id && <img src={`https://img.youtube.com/vi/${t.id}/mqdefault.jpg`} alt="" style={{ width: "100%", borderRadius: 8, display: "block", marginBottom: 10 }} onError={e => { e.target.style.display = "none"; }} />}
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                <span style={{ background: c.accent + "20", color: c.accent, borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 10, flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ background: "#111", color: "#fff", borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 10, flexShrink: 0 }}>{i + 1}</span>
                 <span style={{ fontSize: 11, color: c.textDim }}>{t.show} · {t.ep}{t.date ? ` · ${t.date}` : ""}</span>
               </div>
               <div style={{ fontSize: 13, fontWeight: 600, color: c.text, marginBottom: 10, lineHeight: 1.4 }}>{t.title}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ background: c.green + "12", border: `1px solid ${c.green}30`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text }}><span style={{ color: c.green, fontWeight: 600, marginRight: 6 }}>A</span>{t.copyA}</div>
-                <div style={{ background: c.blue + "12", border: `1px solid ${c.blue}30`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text }}><span style={{ color: c.blue, fontWeight: 600, marginRight: 6 }}>B</span>{t.copyB}</div>
+                {(() => {
+                  const aWin = t.winner === "A";
+                  const bWin = t.winner === "B";
+                  const aColor = aWin ? c.green : "#888";
+                  const bColor = bWin ? c.green : "#888";
+                  const aBg = aWin ? c.green + "15" : "#88888810";
+                  const bBg = bWin ? c.green + "15" : "#88888810";
+                  const aBorder = aWin ? c.green + "40" : "#88888830";
+                  const bBorder = bWin ? c.green + "40" : "#88888830";
+                  return <>
+                    <div style={{ background: aBg, border: `1px solid ${aBorder}`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text }}><span style={{ color: aColor, fontWeight: 700, marginRight: 6 }}>A</span>{t.copyA}</div>
+                    <div style={{ background: bBg, border: `1px solid ${bBorder}`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text }}><span style={{ color: bColor, fontWeight: 700, marginRight: 6 }}>B</span>{t.copyB}</div>
+                  </>;
+                })()}
               </div>
             </div>
           ))}
@@ -910,7 +922,6 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
     return Object.entries(map).map(([title, items]) => ({ title, items, color: BLOCK_COLORS[title] || c.accent }));
   }, [abSuggestions]);
   const [expandedRows, setExpandedRows] = useState(new Set());
-  const [checklistVisible, setChecklistVisible] = useState(false);
   const [abShowFilter, setAbShowFilter] = useState("全部");
   const [abFrameFilter, setAbFrameFilter] = useState("全部");
   const [abWinnerFilter, setAbWinnerFilter] = useState("全部");
@@ -1318,57 +1329,6 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
       </Section>
     )}
 
-    {/* Floating Checklist Button */}
-    <button onClick={() => setChecklistVisible(!checklistVisible)} style={{
-      position: "fixed", bottom: 24, right: 24, zIndex: 1000,
-      width: 48, height: 48, borderRadius: "50%",
-      background: c.accent, color: "#fff", border: "none",
-      cursor: "pointer", fontSize: 18, fontWeight: 700,
-      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      transition: "transform 0.2s",
-      transform: checklistVisible ? "rotate(45deg)" : "none",
-    }}>+</button>
-
-    {/* Slide-in Checklist Panel */}
-    <div style={{
-      position: "fixed", top: 0, right: 0, bottom: 0,
-      width: 340, zIndex: 5000,
-      background: c.card, borderLeft: `1px solid ${c.border}`,
-      boxShadow: checklistVisible ? "-4px 0 24px rgba(0,0,0,0.2)" : "none",
-      transform: checklistVisible ? "translateX(0)" : "translateX(100%)",
-      transition: "transform 0.3s ease",
-      padding: "24px 20px", overflowY: "auto",
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: c.text }}>文案寫作 Checklist</div>
-        <button onClick={() => setChecklistVisible(false)} style={{
-          background: "none", border: "none", color: c.textMuted,
-          cursor: "pointer", fontSize: 18, padding: 4,
-        }}>X</button>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {[
-          "有沒有「就是在說我」的共感入口？",
-          "是否只測一個變數？（其他條件一致）",
-          "有沒有避開質問語氣（「你想___？」）？",
-          "有沒有避開年齡/身份篩選詞？",
-          "如果用恐懼，有沒有搭配資訊缺口或出路？",
-          "如果用金額，是具體數字還是抽象倍數？",
-          "方法論名詞有沒有太早揭露？",
-          "健康題材有沒有用多痛點策略？",
-          "整體調性是溫暖共感還是冷硬恐嚇？（偏前者）",
-          "能不能讓 45-64 歲的觀眾看 0.5 秒就覺得「跟我有關」？",
-          "用語有沒有太年輕化？（45-64 歲佔 57%）",
-          "在手機小螢幕上能不能一眼看完？（58% 手機觀看）",
-        ].map((item, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-            <span style={{ color: c.accent, fontSize: 8, marginTop: 5 }}>●</span>
-            <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6 }}>{item}</span>
-          </div>
-        ))}
-      </div>
-    </div>
     {modalData && <ABListModal tests={modalData.tests} title={modalData.title} onClose={() => setModalData(null)} C={c} />}
   </div>);
 }
@@ -2313,10 +2273,11 @@ function ActionTab({ fullVideos, abTests, abSuggestions, C: c }) {
 }
 
 // ── Shared Slide Modal Shell ──
-function SlideModal({ C: c, onClose, totalPages, defaultPreset, presets, children: renderSlides }) {
+function SlideModal({ C: c, onClose, totalPages, defaultPreset, presets, children: renderSlides, sidePanel = false, sideWidth = "50vw" }) {
   const [page, setPage] = useState(0);
   const [fade, setFade] = useState(true);
   const [slideZoom, setSlideZoom] = useState(1);
+  const [panelOpen, setPanelOpen] = useState(false);
   const mono = "'JetBrains Mono', monospace";
   const now = new Date();
   const fmtD = d => d.toISOString().slice(0, 10);
@@ -2333,50 +2294,71 @@ function SlideModal({ C: c, onClose, totalPages, defaultPreset, presets, childre
   const [endDate, setEndDate] = useState(def[1]);
   const setPreset = (key) => { const d = presetDates[key]; if (d) { setStartDate(d[0]); setEndDate(d[1]); } };
   const go = (dir) => { setFade(false); setTimeout(() => { setPage(p => Math.max(0, Math.min(totalPages - 1, p + dir))); setFade(true); }, 150); };
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+  const useSide = sidePanel && !isMobile;
+  const handleClose = () => { if (useSide) { setPanelOpen(false); setTimeout(onClose, 300); } else onClose(); };
+  useEffect(() => { if (useSide) requestAnimationFrame(() => setPanelOpen(true)); }, []);
   useEffect(() => {
-    const h = (e) => { if (e.key === "Escape") onClose(); else if (e.key === "ArrowRight") go(1); else if (e.key === "ArrowLeft") go(-1); };
+    const h = (e) => { if (e.key === "Escape") handleClose(); else if (e.key === "ArrowRight") go(1); else if (e.key === "ArrowLeft") go(-1); };
     window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
   }, []);
   const inputStyle = { background: c.card, color: c.text, border: `1px solid ${c.border}`, borderRadius: 6, padding: "4px 10px", fontSize: 12 };
   const btnS = (active) => ({ background: active ? c.accent + "25" : "none", border: `1px solid ${active ? c.accent : c.border}`, color: active ? c.accent : c.textMuted, borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'Noto Sans TC', sans-serif" });
   const allPresets = presets || [["本月", "thisMonth"], ["上月", "lastMonth"], ["30天", "30d"], ["90天", "90d"], ["全部", "all"]];
 
+  const innerContent = (
+    <>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: `1px solid ${c.border}`, flexShrink: 0, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} />
+          <span style={{ color: c.textDim }}>→</span>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
+          {allPresets.map(([label, key]) => <button key={key} onClick={() => setPreset(key)} style={btnS(false)}>{label}</button>)}
+          <div style={{ display: "flex", alignItems: "center", border: `1px solid ${c.border}`, borderRadius: 6, overflow: "hidden", marginLeft: 4 }}>
+            {[["A", 0.82], ["A", 1], ["A", 1.2]].map(([label, z], i) => (
+              <button key={z} onClick={() => setSlideZoom(z)} style={{
+                background: slideZoom === z ? c.accent + "20" : "none", border: "none",
+                borderRight: i < 2 ? `1px solid ${c.border}` : "none",
+                color: slideZoom === z ? c.accent : c.textMuted,
+                padding: "4px 7px", cursor: "pointer", fontWeight: 700, fontFamily: "serif",
+                fontSize: [11, 14, 17][i], lineHeight: 1,
+              }}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <button onClick={handleClose} style={{ background: "none", border: "none", color: c.textMuted, fontSize: 22, cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}>✕</button>
+      </div>
+      <div style={{ flex: 1, overflow: "auto", padding: useSide ? "20px 24px" : "32px 40px", transition: "opacity 0.15s", opacity: fade ? 1 : 0, zoom: slideZoom }}>
+        {renderSlides({ startDate, endDate, page, goto: (n) => { setFade(false); setTimeout(() => { setPage(n); setFade(true); }, 150); } })}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 24px", borderTop: `1px solid ${c.border}`, flexShrink: 0 }}>
+        <button onClick={() => go(-1)} disabled={page === 0} style={{ background: page === 0 ? "none" : c.accent + "18", border: `1px solid ${page === 0 ? c.border : c.accent}`, color: page === 0 ? c.textDim : c.accent, borderRadius: 8, padding: "8px 20px", fontSize: 14, cursor: page === 0 ? "default" : "pointer", fontFamily: "'Noto Sans TC', sans-serif" }}>← 上一頁</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {Array.from({ length: totalPages }).map((_, i) => <div key={i} onClick={() => { setFade(false); setTimeout(() => { setPage(i); setFade(true); }, 150); }} style={{ width: i === page ? 20 : 8, height: 8, borderRadius: 4, background: i === page ? c.accent : c.textDim + "40", cursor: "pointer", transition: "all 0.2s" }} />)}
+          </div>
+          <span style={{ color: c.textDim, fontSize: 12, fontFamily: mono }}>{page + 1}/{totalPages}</span>
+        </div>
+        <button onClick={() => go(1)} disabled={page === totalPages - 1} style={{ background: page === totalPages - 1 ? "none" : c.accent + "18", border: `1px solid ${page === totalPages - 1 ? c.border : c.accent}`, color: page === totalPages - 1 ? c.textDim : c.accent, borderRadius: 8, padding: "8px 20px", fontSize: 14, cursor: page === totalPages - 1 ? "default" : "pointer", fontFamily: "'Noto Sans TC', sans-serif" }}>下一頁 →</button>
+      </div>
+    </>
+  );
+
+  if (useSide) {
+    return (
+      <>
+        <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 7997, background: "rgba(0,0,0,0.45)", opacity: panelOpen ? 1 : 0, transition: "opacity 0.3s ease" }} />
+        <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: `min(${sideWidth}, 92vw)`, zIndex: 7998, background: c.bg, borderLeft: `1px solid ${c.border}`, boxShadow: "-8px 0 32px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", overflow: "hidden", transform: panelOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.3s ease" }}>
+          {innerContent}
+        </div>
+      </>
+    );
+  }
+
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} onClick={e => { if (e.target === e.currentTarget) handleClose(); }}>
       <div style={{ background: c.bg, borderRadius: 16, width: "95vw", maxWidth: 960, maxHeight: "92vh", overflow: "hidden", display: "flex", flexDirection: "column", border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: `1px solid ${c.border}`, flexShrink: 0, flexWrap: "wrap", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} />
-            <span style={{ color: c.textDim }}>→</span>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
-            {allPresets.map(([label, key]) => <button key={key} onClick={() => setPreset(key)} style={btnS(false)}>{label}</button>)}
-            <div style={{ display: "flex", alignItems: "center", border: `1px solid ${c.border}`, borderRadius: 6, overflow: "hidden", marginLeft: 4 }}>
-              {[["A", 0.82], ["A", 1], ["A", 1.2]].map(([label, z], i) => (
-                <button key={z} onClick={() => setSlideZoom(z)} style={{
-                  background: slideZoom === z ? c.accent + "20" : "none", border: "none",
-                  borderRight: i < 2 ? `1px solid ${c.border}` : "none",
-                  color: slideZoom === z ? c.accent : c.textMuted,
-                  padding: "4px 7px", cursor: "pointer", fontWeight: 700, fontFamily: "serif",
-                  fontSize: [11, 14, 17][i], lineHeight: 1,
-                }}>{label}</button>
-              ))}
-            </div>
-          </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: c.textMuted, fontSize: 22, cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}>✕</button>
-        </div>
-        <div style={{ flex: 1, overflow: "auto", padding: "32px 40px", transition: "opacity 0.15s", opacity: fade ? 1 : 0, zoom: slideZoom }}>
-          {renderSlides({ startDate, endDate, page, goto: (n) => { setFade(false); setTimeout(() => { setPage(n); setFade(true); }, 150); } })}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 24px", borderTop: `1px solid ${c.border}`, flexShrink: 0 }}>
-          <button onClick={() => go(-1)} disabled={page === 0} style={{ background: page === 0 ? "none" : c.accent + "18", border: `1px solid ${page === 0 ? c.border : c.accent}`, color: page === 0 ? c.textDim : c.accent, borderRadius: 8, padding: "8px 20px", fontSize: 14, cursor: page === 0 ? "default" : "pointer", fontFamily: "'Noto Sans TC', sans-serif" }}>← 上一頁</button>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ display: "flex", gap: 6 }}>
-              {Array.from({ length: totalPages }).map((_, i) => <div key={i} onClick={() => { setFade(false); setTimeout(() => { setPage(i); setFade(true); }, 150); }} style={{ width: i === page ? 20 : 8, height: 8, borderRadius: 4, background: i === page ? c.accent : c.textDim + "40", cursor: "pointer", transition: "all 0.2s" }} />)}
-            </div>
-            <span style={{ color: c.textDim, fontSize: 12, fontFamily: mono }}>{page + 1}/{totalPages}</span>
-          </div>
-          <button onClick={() => go(1)} disabled={page === totalPages - 1} style={{ background: page === totalPages - 1 ? "none" : c.accent + "18", border: `1px solid ${page === totalPages - 1 ? c.border : c.accent}`, color: page === totalPages - 1 ? c.textDim : c.accent, borderRadius: 8, padding: "8px 20px", fontSize: 14, cursor: page === totalPages - 1 ? "default" : "pointer", fontFamily: "'Noto Sans TC', sans-serif" }}>下一頁 →</button>
-        </div>
+        {innerContent}
       </div>
     </div>
   );
@@ -2399,11 +2381,104 @@ function useFilteredData(allVideos, allAbTests, startDate, endDate) {
   return { videos, abTests };
 }
 
+// ── Checklist Slide Panel ──
+function ChecklistPanel({ onClose, C: c }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => { requestAnimationFrame(() => setOpen(true)); }, []);
+  const handleClose = () => { setOpen(false); setTimeout(onClose, 300); };
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+  const items = [
+    "有沒有「就是在說我」的共感入口？",
+    "是否只測一個變數？（其他條件一致）",
+    "有沒有避開質問語氣（「你想___？」）？",
+    "有沒有避開年齡/身份篩選詞？",
+    "如果用恐懼，有沒有搭配資訊缺口或出路？",
+    "如果用金額，是具體數字還是抽象倍數？",
+    "方法論名詞有沒有太早揭露？",
+    "健康題材有沒有用多痛點策略？",
+    "整體調性是溫暖共感還是冷硬恐嚇？（偏前者）",
+    "能不能讓 45-64 歲的觀眾看 0.5 秒就覺得「跟我有關」？",
+    "用語有沒有太年輕化？（45-64 歲佔 57%）",
+    "在手機小螢幕上能不能一眼看完？（58% 手機觀看）",
+  ];
+  const content = (
+    <>
+      <div style={{ position: "sticky", top: 0, background: c.card, borderBottom: `1px solid ${c.border}`, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: c.text }}>✍️ 文案寫作 Checklist</div>
+        <button onClick={handleClose} style={{ background: "none", border: "none", cursor: "pointer", color: c.textMuted, fontSize: 20, lineHeight: 1, padding: "0 4px" }}>✕</button>
+      </div>
+      <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {items.map((item, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <span style={{ color: c.accent, fontSize: 10, marginTop: 5, flexShrink: 0 }}>●</span>
+            <span style={{ color: c.textMuted, fontSize: 13, lineHeight: 1.6 }}>{item}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+  if (isMobile) {
+    return (
+      <div style={{ position: "fixed", inset: 0, zIndex: 8000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)" }} onClick={e => { if (e.target === e.currentTarget) handleClose(); }}>
+        <div style={{ background: c.card, borderRadius: 12, width: "90vw", maxHeight: "80vh", overflowY: "auto", border: `1px solid ${c.border}` }}>{content}</div>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 7999, background: "rgba(0,0,0,0.45)", opacity: open ? 1 : 0, transition: "opacity 0.3s ease" }} />
+      <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(340px, 92vw)", zIndex: 8000, background: c.card, borderLeft: `1px solid ${c.border}`, boxShadow: "-8px 0 32px rgba(0,0,0,0.25)", overflowY: "auto", transform: open ? "translateX(0)" : "translateX(100%)", transition: "transform 0.3s ease" }}>
+        {content}
+      </div>
+    </>
+  );
+}
+
+// ── Toolbox FAB (工具中心) ──
+function ToolboxFAB({ onSelect, C: c }) {
+  const [open, setOpen] = useState(false);
+  const tools = [
+    { id: "checklist", icon: "✍️", label: "文案清單" },
+    { id: "report",    icon: "📊", label: "月報簡報" },
+    { id: "health",    icon: "🏥", label: "頻道健檢" },
+    { id: "diagnosis", icon: "🔍", label: "頻道診斷" },
+  ];
+  const radius = 72;
+  const arcAngles = [0, 30, 60, 90].map(d => d * Math.PI / 180);
+  return (
+    <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 5500 }}>
+      {open && <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: -1 }} />}
+      {tools.map((tool, i) => {
+        const a = arcAngles[i];
+        const tx = -Math.sin(a) * radius;
+        const ty = -Math.cos(a) * radius;
+        return (
+          <div key={tool.id} style={{
+            position: "absolute", bottom: 4, right: 4, width: 40, height: 40,
+            transform: open ? `translate(${tx}px, ${ty}px)` : "translate(0,0)",
+            opacity: open ? 1 : 0,
+            transition: `transform 0.3s cubic-bezier(0.34,1.56,0.64,1) ${open ? i * 50 : (3 - i) * 30}ms, opacity 0.2s ease ${open ? i * 50 : 0}ms`,
+            pointerEvents: open ? "auto" : "none",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <div style={{ position: "absolute", right: "calc(100% + 8px)", top: "50%", transform: "translateY(-50%)", background: c.card, border: `1px solid ${c.border}`, borderRadius: 6, padding: "3px 8px", fontSize: 11, color: c.text, whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(0,0,0,0.2)", pointerEvents: "none" }}>{tool.label}</div>
+            <button onClick={() => { setOpen(false); onSelect(tool.id); }} style={{ width: 40, height: 40, borderRadius: "50%", background: c.card, border: `2px solid ${c.border}`, cursor: "pointer", fontSize: 18, boxShadow: "0 2px 12px rgba(0,0,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.1)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+            >{tool.icon}</button>
+          </div>
+        );
+      })}
+      <button onClick={() => setOpen(!open)} title="工具中心" style={{ position: "relative", zIndex: 2, width: 48, height: 48, borderRadius: "50%", background: c.accent, color: "#fff", border: "none", cursor: "pointer", fontSize: 20, boxShadow: "0 4px 16px rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", transform: open ? "rotate(45deg)" : "rotate(0deg)", transition: "transform 0.25s ease" }}>⚙</button>
+    </div>
+  );
+}
+
 // ── Report Modal ──
 function ReportModal({ allVideos, allAbTests, C: c, onClose }) {
   const [sd, setSd] = useState(""); const [ed, setEd] = useState("");
   return (
-    <SlideModal C={c} onClose={onClose} totalPages={6} defaultPreset="thisMonth">
+    <SlideModal C={c} onClose={onClose} totalPages={6} defaultPreset="thisMonth" sidePanel sideWidth="50vw">
       {({ startDate, endDate, page }) => {
         return <ReportSlides allVideos={allVideos} allAbTests={allAbTests} startDate={startDate} endDate={endDate} page={page} C={c} />;
       }}
@@ -2721,7 +2796,7 @@ function ReportSlides({ allVideos, allAbTests, startDate, endDate, page, C: c })
 // ── Health Check Modal ──
 function HealthCheckModal({ allVideos, allAbTests, C: c, onClose }) {
   return (
-    <SlideModal C={c} onClose={onClose} totalPages={9} defaultPreset="90d"
+    <SlideModal C={c} onClose={onClose} totalPages={9} defaultPreset="90d" sidePanel sideWidth="50vw"
       presets={[["本月", "thisMonth"], ["上月", "lastMonth"], ["30天", "30d"], ["90天", "90d"], ["本季", "thisQ"], ["全部", "all"]]}>
       {({ startDate, endDate, page, goto }) => <HealthSlides allVideos={allVideos} allAbTests={allAbTests} startDate={startDate} endDate={endDate} page={page} goto={goto} C={c} />}
     </SlideModal>
@@ -3097,7 +3172,7 @@ function HealthSlides({ allVideos, allAbTests, startDate, endDate, page, goto, C
 // ── Diagnosis Modal ──
 function DiagnosisModal({ allVideos, allAbTests, reachData, formulaConfig, C: c, onClose }) {
   return (
-    <SlideModal C={c} onClose={onClose} totalPages={9} defaultPreset="90d"
+    <SlideModal C={c} onClose={onClose} totalPages={9} defaultPreset="90d" sidePanel sideWidth="50vw"
       presets={[["本月", "thisMonth"], ["上月", "lastMonth"], ["30天", "30d"], ["90天", "90d"], ["本季", "thisQ"], ["全部", "all"]]}>
       {({ startDate, endDate, page, goto }) => <DiagnosisSlides allVideos={allVideos} allAbTests={allAbTests} reachData={reachData || {}} formulaConfig={formulaConfig || {}} startDate={startDate} endDate={endDate} page={page} goto={goto} C={c} />}
     </SlideModal>
@@ -3716,9 +3791,7 @@ export default function App() {
   const zoomMap = { small: 0.88, medium: 1, large: 1.12 };
   const [rawData, setRawData] = useState(null);
   const [dateRange, setDateRange] = useState("all");
-  const [showReport, setShowReport] = useState(false);
-  const [showHealthCheck, setShowHealthCheck] = useState(false);
-  const [showDiagnosis, setShowDiagnosis] = useState(false);
+  const [toolPanel, setToolPanel] = useState(null);
   const [reachData, setReachData] = useState({});
   const c = isDark ? themes.dark : themes.light;
 
@@ -3785,20 +3858,6 @@ export default function App() {
               <option value="30d">近 30 天</option>
               <option value="90d">近 3 個月</option>
             </select>
-            {[
-              { label: "📊 月報簡報", tip: "自動產生月度報告簡報", bg: c.accent, onClick: () => setShowReport(true) },
-              { label: "🏥 頻道健檢", tip: "數據報表 — 掌握頻道現況", bg: c.green, onClick: () => setShowHealthCheck(true) },
-              { label: "🔍 頻道診斷", tip: "策略分析 — 找出成長瓶頸", bg: c.red, onClick: () => setShowDiagnosis(true) },
-            ].map(btn => (
-              <div key={btn.label} style={{ position: "relative", display: "inline-block" }}>
-                <button onClick={btn.onClick} style={{
-                  background: btn.bg, color: "#fff", border: "none", borderRadius: 6,
-                  padding: "6px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600,
-                  fontFamily: "'Noto Sans TC', sans-serif", whiteSpace: "nowrap", transition: "opacity 0.2s",
-                }} onMouseEnter={e => { e.target.style.opacity = "0.85"; e.target.parentElement.querySelector('[data-tooltip]').style.opacity = "1"; e.target.parentElement.querySelector('[data-tooltip]').style.pointerEvents = "auto"; }} onMouseMove={e => { const tt = e.target.parentElement.querySelector('[data-tooltip]'); const x = e.clientX - e.target.parentElement.getBoundingClientRect().left; tt.style.left = x + 'px'; tt.style.transform = 'translateX(-50%)'; }} onMouseLeave={e => { e.target.style.opacity = "1"; e.target.parentElement.querySelector('[data-tooltip]').style.opacity = "0"; e.target.parentElement.querySelector('[data-tooltip]').style.pointerEvents = "none"; }}>{btn.label}</button>
-                <div data-tooltip style={{ position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)", background: c.card, border: `1px solid ${c.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 12, color: c.text, whiteSpace: "nowrap", opacity: 0, pointerEvents: "none", transition: "opacity 0.15s", zIndex: 10, boxShadow: `0 4px 12px rgba(0,0,0,${c.bg === "#08080A" ? "0.4" : "0.1"})` }}>{btn.tip}</div>
-              </div>
-            ))}
             <FontSizeControl value={fontSize} onChange={setFontSize} C={c} />
             <WidthSwitch isFullWidth={isFullWidth} toggle={() => setIsFullWidth(!isFullWidth)} C={c} />
             <ThemeSwitch isDark={isDark} toggle={() => setIsDark(!isDark)} C={c} />
@@ -3860,9 +3919,11 @@ export default function App() {
         {tab === 7 && <TATopicTab fullVideos={filteredVideos} C={c} />}
         {tab === 8 && <ActionTab fullVideos={filteredVideos} abTests={abTests} abSuggestions={abSuggestions} C={c} />}
       </div>
-      {showReport && <ReportModal allVideos={fullVideos} allAbTests={abTests} C={c} onClose={() => setShowReport(false)} />}
-      {showHealthCheck && <HealthCheckModal allVideos={fullVideos} allAbTests={abTests} C={c} onClose={() => setShowHealthCheck(false)} />}
-      {showDiagnosis && <DiagnosisModal allVideos={fullVideos} allAbTests={abTests} reachData={reachData} formulaConfig={formulaConfig} C={c} onClose={() => setShowDiagnosis(false)} />}
+      <ToolboxFAB onSelect={setToolPanel} C={c} />
+      {toolPanel === "checklist" && <ChecklistPanel onClose={() => setToolPanel(null)} C={c} />}
+      {toolPanel === "report" && <ReportModal allVideos={fullVideos} allAbTests={abTests} C={c} onClose={() => setToolPanel(null)} />}
+      {toolPanel === "health" && <HealthCheckModal allVideos={fullVideos} allAbTests={abTests} C={c} onClose={() => setToolPanel(null)} />}
+      {toolPanel === "diagnosis" && <DiagnosisModal allVideos={fullVideos} allAbTests={abTests} reachData={reachData} formulaConfig={formulaConfig} C={c} onClose={() => setToolPanel(null)} />}
     </div>
   );
 }
