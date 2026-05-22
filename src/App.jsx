@@ -897,8 +897,14 @@ function ABListModal({ tests, title, onClose, C: c }) {
                   const aBorder = aWin ? c.green + "40" : "#88888830";
                   const bBorder = bWin ? c.green + "40" : "#88888830";
                   return <>
-                    <div style={{ background: aBg, border: `1px solid ${aBorder}`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text }}><span style={{ color: aColor, fontWeight: 700, marginRight: 6 }}>A</span>{t.copyA}</div>
-                    <div style={{ background: bBg, border: `1px solid ${bBorder}`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text }}><span style={{ color: bColor, fontWeight: 700, marginRight: 6 }}>B</span>{t.copyB}</div>
+                    <div style={{ background: aBg, border: `1px solid ${aBorder}`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <div><span style={{ color: aColor, fontWeight: 700, marginRight: 6 }}>A</span>{t.copyA}</div>
+                      {t.ctrA != null && <span style={{ color: aColor, fontWeight: 700, fontSize: 11, flexShrink: 0 }}>{(+t.ctrA).toFixed(1)}%</span>}
+                    </div>
+                    <div style={{ background: bBg, border: `1px solid ${bBorder}`, borderRadius: 6, padding: "6px 10px", fontSize: 12, color: c.text, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <div><span style={{ color: bColor, fontWeight: 700, marginRight: 6 }}>B</span>{t.copyB}</div>
+                      {t.ctrB != null && <span style={{ color: bColor, fontWeight: 700, fontSize: 11, flexShrink: 0 }}>{(+t.ctrB).toFixed(1)}%</span>}
+                    </div>
                   </>;
                 })()}
               </div>
@@ -2437,6 +2443,7 @@ function ChecklistPanel({ onClose, C: c }) {
 // ── Toolbox FAB (工具中心) ──
 function ToolboxFAB({ onSelect, C: c }) {
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(null);
   const tools = [
     { id: "checklist", icon: "✍️", label: "文案清單" },
     { id: "report",    icon: "📊", label: "月報簡報" },
@@ -2460,8 +2467,10 @@ function ToolboxFAB({ onSelect, C: c }) {
             transition: `transform 0.3s cubic-bezier(0.34,1.56,0.64,1) ${open ? i * 50 : (3 - i) * 30}ms, opacity 0.2s ease ${open ? i * 50 : 0}ms`,
             pointerEvents: open ? "auto" : "none",
             display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <div style={{ position: "absolute", right: "calc(100% + 8px)", top: "50%", transform: "translateY(-50%)", background: c.card, border: `1px solid ${c.border}`, borderRadius: 6, padding: "3px 8px", fontSize: 11, color: c.text, whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(0,0,0,0.2)", pointerEvents: "none" }}>{tool.label}</div>
+          }}
+          onMouseEnter={() => setHovered(tool.id)}
+          onMouseLeave={() => setHovered(null)}>
+            <div style={{ position: "absolute", right: "calc(100% + 8px)", top: "50%", transform: "translateY(-50%)", background: c.card, border: `1px solid ${c.border}`, borderRadius: 6, padding: "3px 8px", fontSize: 11, color: c.text, whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(0,0,0,0.2)", pointerEvents: "none", opacity: hovered === tool.id ? 1 : 0, transition: "opacity 0.15s" }}>{tool.label}</div>
             <button onClick={() => { setOpen(false); onSelect(tool.id); }} style={{ width: 40, height: 40, borderRadius: "50%", background: c.card, border: `2px solid ${c.border}`, cursor: "pointer", fontSize: 18, boxShadow: "0 2px 12px rgba(0,0,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.15s" }}
               onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.1)"; }}
               onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
