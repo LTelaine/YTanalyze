@@ -471,7 +471,7 @@ function OverviewTab({ fullVideos, C: c }) {
     return fullVideos.filter(v => {
       if (!v.date) return false;
       return new Date(v.date.replace(/\//g, "-")) >= cutoff;
-    }).sort((a, b) => b.views - a.views);
+    }).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   }, [fullVideos]);
   const [recentPage, setRecentPage] = useState(0);
   const recentPerPage = 10;
@@ -504,7 +504,7 @@ function OverviewTab({ fullVideos, C: c }) {
     <Section title="近三個月的影片觀看數" sub={`上架日期 ≥ ${new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toLocaleDateString("zh-TW")} ・ 共 ${recentVideos.length} 支`}>
       <SortableTable C={c} headers={["上架日期", "節目", "集數", "標題", "觀看", "訂閱", "互動率", "商機"]}
         dataKeys={["date", "show", "ep", "title", "views", "subs", "interactRate", "commercialIdx"]}
-        data={recentVideos.slice(recentPage * recentPerPage, (recentPage + 1) * recentPerPage)} defaultSortKey="views"
+        data={recentVideos.slice(recentPage * recentPerPage, (recentPage + 1) * recentPerPage)} defaultSortKey="date"
         renderRow={(v, i) => (
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
             <td style={{ padding: "10px 14px", color: c.textMuted, fontSize: 11, whiteSpace: "nowrap" }}>{v.date}</td>
