@@ -283,7 +283,7 @@ function Tip({ text, children, C: c, inline }) {
       {children}
       {pos && (
         <div style={{
-          position: "fixed", left: Math.min(pos.x + 14, window.innerWidth - 340), top: pos.y + 16,
+          position: "fixed", left: Math.min(pos.x + 14, window.innerWidth - 340), top: pos.y - 8,
           zIndex: 9999, pointerEvents: "none",
           background: c.card, border: `1px solid ${c.border}`,
           borderRadius: 10, padding: "10px 14px",
@@ -322,7 +322,7 @@ function ABCardTip({ tests, children, C: c }) {
       {children}
       {pos && tests?.length > 0 && (
         <div style={{
-          position: "fixed", left: Math.min(pos.x + 14, window.innerWidth - 300), top: Math.max(pos.y + 16, 10),
+          position: "fixed", left: Math.min(pos.x + 14, window.innerWidth - 300), top: Math.max(pos.y - 8, 10),
           zIndex: 9999, background: c.card, border: `1px solid ${c.border}`, borderRadius: 10,
           padding: 12, boxShadow: `0 8px 30px rgba(0,0,0,${c.bg === "#08080A" ? "0.5" : "0.15"})`,
           pointerEvents: "none", maxWidth: 280, maxHeight: 420, overflowY: "auto",
@@ -836,7 +836,11 @@ function ABTab({ abTests, abSuggestions, C: c }) {
     return Object.entries(map).map(([title, items]) => ({ title, items, color: BLOCK_COLORS[title] || c.accent }));
   }, [abSuggestions]);
   const [expandedRows, setExpandedRows] = useState(new Set());
-  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checklistVisible, setChecklistVisible] = useState(false);
+  const [abShowFilter, setAbShowFilter] = useState("全部");
+  const [abFrameFilter, setAbFrameFilter] = useState("全部");
+  const [abWinnerFilter, setAbWinnerFilter] = useState("全部");
+  const [openSuggBlock, setOpenSuggBlock] = useState(null);
 
   // Stats by test variable
   const varStats = useMemo(() => {
@@ -866,6 +870,18 @@ function ABTab({ abTests, abSuggestions, C: c }) {
   }, []);
 
   const frameColorMap = { "好奇懸念": c.accent, "恐懼損失": c.red, "實用承諾": c.blue, "權威背書": c.purple, "情感共鳴": c.pink, "社會認同": c.teal, "損失厭惡": c.red, "恐懼訴求": c.coral, "權威解答": c.purple, "權威揭密": c.purple, "利益驅動": c.teal, "共感釋放": c.pink };
+
+  const trendData = useMemo(() => {
+    return [...abTests].sort((a, b) => {
+      const numA = parseInt(a.ep.replace(/\D/g, "")) || 0;
+      const numB = parseInt(b.ep.replace(/\D/g, "")) || 0;
+      return numA - numB;
+    }).map((t, i, arr) => {
+      const gap = Math.abs(t.ctrB - t.ctrA);
+      const avg3 = i >= 2 ? +((arr.slice(Math.max(0, i - 2), i + 1).reduce((s, x) => s + Math.abs(x.ctrB - x.ctrA), 0) / Math.min(3, i + 1)).toFixed(1)) : gap;
+      return { ep: t.ep, gap: +gap.toFixed(1), winner: t.winner, avg3 };
+    });
+  }, [abTests]);
 
   const VAR_CONCLUSIONS = {
     "結尾鉤子": { conclusion: "反常識 > 權威背書；背叛感 > 真假反差", confidence: "累積中", color: c.accent },
@@ -905,73 +921,62 @@ function ABTab({ abTests, abSuggestions, C: c }) {
   }, [abTests]);
 
   return (<div>
-    {/* Checklist Panel */}
-    <Card C={c} style={{ marginBottom: 14 }}>
-      <div onClick={() => setChecklistOpen(!checklistOpen)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: c.text }}>文案寫作 Checklist</div>
-        <span style={{ fontSize: 11, color: c.textMuted }}>{checklistOpen ? "▲ 收起" : "▼ 展開"}</span>
-      </div>
-      {checklistOpen && (
-        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-          {[
-            "有沒有「就是在說我」的共感入口？",
-            "是否只測一個變數？（其他條件一致）",
-            "有沒有避開質問語氣（「你想___？」）？",
-            "有沒有避開年齡/身份篩選詞？",
-            "如果用恐懼，有沒有搭配資訊缺口或出路？",
-            "如果用金額，是具體數字還是抽象倍數？",
-            "方法論名詞有沒有太早揭露？",
-            "健康題材有沒有用多痛點策略？",
-            "整體調性是溫暖共感還是冷硬恐嚇？（偏前者）",
-            "能不能讓 45–64 歲的觀眾看 0.5 秒就覺得「跟我有關」？",
-            "用語有沒有太年輕化？（45–64 歲佔 57%）",
-            "在手機小螢幕上能不能一眼看完？（58% 手機觀看）",
-          ].map((item, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-              <span style={{ color: c.accent, fontSize: 8, marginTop: 5 }}>●</span>
-              <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6 }}>{item}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-
     {/* KPI row */}
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
       <KPI label="總測試次數" value={abTests.length} C={c} title={abTests.map(t => `${t.show} ${t.ep}｜${t.title}`).join("\n")} />
       <KPI label="B 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "B").length / abTests.length * 100)}%`} color={c.green} C={c} title={`B 勝出：\n${abTests.filter(t => t.winner === "B").map(t => `${t.show} ${t.ep}｜${t.title}`).join("\n")}`} />
+      <KPI label="A 版勝出率" value={`${Math.round(abTests.filter(t => t.winner === "A").length / abTests.length * 100)}%`} color={c.coral} C={c} title={`A 勝出：\n${abTests.filter(t => t.winner === "A").map(t => `${t.show} ${t.ep}｜${t.title}`).join("\n")}`} />
       <KPI label="平均 CTR 差距" value={`${(abTests.reduce((a, t) => a + Math.abs(t.ctrB - t.ctrA), 0) / abTests.length).toFixed(1)}%`} color={c.accent} C={c} title={abTests.map(t => `${t.show} ${t.ep}｜${t.title}: ${Math.abs(t.ctrB - t.ctrA).toFixed(1)}%`).join("\n")} />
       <KPI label="最大 CTR 差距" value={`${Math.max(...abTests.map(t => Math.abs(t.ctrB - t.ctrA))).toFixed(1)}%`} sub={(() => { const t = abTests.reduce((a, b) => Math.abs(b.ctrB - b.ctrA) > Math.abs(a.ctrB - a.ctrA) ? b : a); return `${t.show} ${t.ep}`; })()} color={c.coral} C={c} />
     </div>
 
-    {/* Test Variable Analysis */}
-    <Section title="測試變數效益分析" sub="議題包裝 vs 情緒框架 vs 混合，哪種測試方向 CTR 差距最大？">
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {varStats.map(v => (
-          <ABCardTip key={v.type} tests={v.tests} C={c}><Card C={c} style={{ flex: "1 1 180px", minWidth: 170 }}>
-            <div style={{ color: c.text, fontWeight: 600, fontSize: 14, marginBottom: 12 }}>{v.type}</div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ color: c.textMuted, fontSize: 11 }}>測試次數</span>
-              <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{v.count}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ color: c.textMuted, fontSize: 11 }}>平均 CTR 差距</span>
-              <span style={{ color: c.accent, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{v.avgGap}%</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: c.textMuted, fontSize: 11 }}>B 版勝出</span>
-              <span style={{ color: c.green, fontFamily: "'JetBrains Mono', monospace" }}>{v.wins.B}/{v.count}</span>
-            </div>
-            {VAR_CONCLUSIONS[v.type] && <>
-              <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${c.border}` }}>
-                <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 4 }}>已驗證結論</div>
-                <div style={{ fontSize: 11, color: c.text, lineHeight: 1.4 }}>{VAR_CONCLUSIONS[v.type].conclusion}</div>
-                <span style={{ display: "inline-block", marginTop: 6, fontSize: 9, padding: "2px 8px", borderRadius: 10, fontWeight: 600, background: VAR_CONCLUSIONS[v.type].color + "18", color: VAR_CONCLUSIONS[v.type].color }}>{VAR_CONCLUSIONS[v.type].confidence}</span>
-              </div>
-            </>}
-          </Card></ABCardTip>
-        ))}
-      </div>
+    {/* AB Test Trend */}
+    <Section title="AB 測試趨勢" sub="CTR 差距隨實驗累積的變化">
+      <Card C={c}>
+        <ResponsiveContainer width="100%" height={250}>
+          <ComposedChart data={trendData}>
+            <CartesianGrid strokeDasharray="3 3" stroke={c.border} />
+            <XAxis dataKey="ep" stroke={c.textDim} fontSize={10} />
+            <YAxis stroke={c.textDim} fontSize={11} unit="%" />
+            <Tooltip contentStyle={TT(c)} formatter={(v, name) => `${v}%`} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="gap" name="CTR 差距" radius={[4, 4, 0, 0]} barSize={24}>
+              {trendData.map((d, i) => <Cell key={i} fill={d.winner === "A" ? c.coral : c.green} />)}
+            </Bar>
+            <Area type="monotone" dataKey="avg3" name="3期移動平均" stroke={c.accent} fill={c.accent + "15"} strokeWidth={2} dot={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+        <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 8 }}>
+          <span style={{ fontSize: 10, color: c.coral, display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: c.coral, display: "inline-block" }} />A 版勝</span>
+          <span style={{ fontSize: 10, color: c.green, display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: c.green, display: "inline-block" }} />B 版勝</span>
+        </div>
+      </Card>
+    </Section>
+
+    {/* Framework Win Rate */}
+    <Section title="情緒框架勝率" sub="各框架在 AB test 中的表現">
+      <Card C={c}>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={frameStats} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" stroke={c.border} horizontal={false} />
+            <XAxis type="number" stroke={c.textDim} fontSize={11} domain={[0, 100]} unit="%" />
+            <YAxis type="category" dataKey="frame" stroke={c.textDim} fontSize={11} width={75} />
+            <Tooltip content={({ active, payload }) => {
+              if (!active || !payload?.[0]) return null;
+              const d = payload[0].payload;
+              return <div style={{ ...TT(c), padding: "8px 12px" }}>
+                <div style={{ fontWeight: 600, color: frameColorMap[d.frame] || c.accent }}>{d.frame}</div>
+                <div style={{ fontSize: 11, marginTop: 4 }}>勝率：{d.winRate}%</div>
+                <div style={{ fontSize: 11 }}>平均 CTR：{d.avgCTR}%</div>
+                <div style={{ fontSize: 11 }}>使用次數：{d.count}</div>
+              </div>;
+            }} />
+            <Bar dataKey="winRate" name="勝率" radius={[0, 5, 5, 0]}>
+              {frameStats.map((f, i) => <Cell key={i} fill={frameColorMap[f.frame] || c.accent} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
     </Section>
 
     {/* Formula Types Analysis */}
@@ -994,58 +999,71 @@ function ABTab({ abTests, abSuggestions, C: c }) {
       </div>
     </Section>
 
-    {/* Framework Win Rate */}
-    <Section title="情緒框架勝率" sub="各框架在 AB test 中的表現">
-      <Card C={c}>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={frameStats} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" stroke={c.border} horizontal={false} />
-            <XAxis type="number" stroke={c.textDim} fontSize={11} domain={[0, 100]} unit="%" />
-            <YAxis type="category" dataKey="frame" stroke={c.textDim} fontSize={11} width={75} />
-            <Tooltip contentStyle={TT(c)} formatter={(v, name) => name === "winRate" ? `${v}%` : v.toFixed(1) + "%"} />
-            <Bar dataKey="winRate" name="勝率" radius={[0, 5, 5, 0]}>
-              {frameStats.map((f, i) => <Cell key={i} fill={frameColorMap[f.frame] || c.accent} />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-        {frameStats.map(f => (
-          <Tip key={f.frame} text={f.eps.join("\n")} C={c}>
-            <Card C={c} style={{ flex: "1 1 120px", minWidth: 120, padding: 14 }}>
-              <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 4 }}>{f.frame}</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: frameColorMap[f.frame] || c.accent, fontFamily: "'JetBrains Mono', monospace" }}>{f.winRate}%</div>
-              <div style={{ fontSize: 10, color: c.textDim, marginTop: 2 }}>平均 CTR {f.avgCTR}% ・ {f.count} 次</div>
-            </Card>
-          </Tip>
-        ))}
-      </div>
-    </Section>
-
-    {/* Cumulative Framework Analysis */}
-    <Section title="累積情緒框架分析" sub="各框架使用次數與勝率對照">
-      <Card C={c}>
-        <ResponsiveContainer width="100%" height={300}>
-          <ComposedChart data={frameStats}>
-            <CartesianGrid strokeDasharray="3 3" stroke={c.border} />
-            <XAxis dataKey="frame" stroke={c.textDim} fontSize={10} />
-            <YAxis yAxisId="left" stroke={c.accent} fontSize={11} label={{ value: "使用次數", angle: -90, position: "insideLeft", fill: c.textMuted, fontSize: 11 }} />
-            <YAxis yAxisId="right" orientation="right" stroke={c.green} fontSize={11} domain={[0, 100]} label={{ value: "勝率 %", angle: 90, position: "insideRight", fill: c.textMuted, fontSize: 11 }} />
-            <Tooltip contentStyle={TT(c)} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar yAxisId="left" dataKey="count" name="使用次數" fill={c.accent} radius={[4, 4, 0, 0]} barSize={30} />
-            <Bar yAxisId="right" dataKey="winRate" name="勝率 %" fill={c.green} radius={[4, 4, 0, 0]} barSize={30} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </Card>
-    </Section>
-
     {/* AB Test Detail Table */}
     <Section title="每次測試詳情" sub="點擊欄位標題排序 ・ 點「更多分析」展開詳細說明">
+      {/* Filter Bar */}
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 14, alignItems: "flex-end" }}>
+        <div>
+          <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 4, letterSpacing: "0.04em" }}>節目</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {["全部", "授ㄉㄟ私捏", "防詐特攻隊", "醫起好健康"].map(s => {
+              const active = abShowFilter === s;
+              return <button key={s} onClick={() => setAbShowFilter(s)} style={{
+                background: active ? c.accent + "18" : "none",
+                border: `1px solid ${active ? c.accent : c.border}`,
+                borderRadius: 14, color: active ? c.accent : c.textMuted,
+                padding: "4px 12px", cursor: "pointer", fontSize: 11,
+                fontFamily: "'Noto Sans TC', sans-serif", transition: "all 0.15s",
+              }}>{s}</button>;
+            })}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 4, letterSpacing: "0.04em" }}>框架</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {["全部", "共感釋放", "好奇懸念", "利益驅動", "損失厭惡", "恐懼訴求", "權威解答", "權威揭密"].map(s => {
+              const active = abFrameFilter === s;
+              return <button key={s} onClick={() => setAbFrameFilter(s)} style={{
+                background: active ? c.accent + "18" : "none",
+                border: `1px solid ${active ? c.accent : c.border}`,
+                borderRadius: 14, color: active ? c.accent : c.textMuted,
+                padding: "4px 12px", cursor: "pointer", fontSize: 11,
+                fontFamily: "'Noto Sans TC', sans-serif", transition: "all 0.15s",
+              }}>{s}</button>;
+            })}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 4, letterSpacing: "0.04em" }}>勝出</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {["全部", "A版勝", "B版勝"].map(s => {
+              const active = abWinnerFilter === s;
+              return <button key={s} onClick={() => setAbWinnerFilter(s)} style={{
+                background: active ? c.accent + "18" : "none",
+                border: `1px solid ${active ? c.accent : c.border}`,
+                borderRadius: 14, color: active ? c.accent : c.textMuted,
+                padding: "4px 12px", cursor: "pointer", fontSize: 11,
+                fontFamily: "'Noto Sans TC', sans-serif", transition: "all 0.15s",
+              }}>{s}</button>;
+            })}
+          </div>
+        </div>
+      </div>
       <SortableTable C={c}
         headers={["集數", "節目", "測試變數", "A 文案", "B 文案", "CTR 對比", "差距", "勝出", ""]}
         dataKeys={["ep", "show", "testVar", "copyA", "copyB", null, "gap", "winner", null]}
-        data={abTests.map(t => ({ ...t, gap: +(t.ctrB - t.ctrA).toFixed(1) }))}
+        data={abTests.filter(t => {
+          if (abShowFilter !== "全部" && t.show !== abShowFilter) return false;
+          if (abFrameFilter !== "全部") {
+            const allFrames = `${t.mainFrameA || ""} ${t.frameA || ""} ${t.mainFrameB || ""} ${t.frameB || ""}`;
+            if (!allFrames.includes(abFrameFilter)) return false;
+          }
+          if (abWinnerFilter !== "全部") {
+            if (abWinnerFilter === "A版勝" && t.winner !== "A") return false;
+            if (abWinnerFilter === "B版勝" && t.winner !== "B") return false;
+          }
+          return true;
+        }).map(t => ({ ...t, gap: +(t.ctrB - t.ctrA).toFixed(1) }))}
         renderRow={(t, i) => {
           const maxCTR = Math.max(t.ctrA, t.ctrB) || 1;
           const isExpanded = expandedRows.has(t.ep);
@@ -1124,23 +1142,120 @@ function ABTab({ abTests, abSuggestions, C: c }) {
       />
     </Section>
 
+    {/* Test Variable Analysis */}
+    <Section title="測試變數效益分析" sub="議題包裝 vs 情緒框架 vs 混合，哪種測試方向 CTR 差距最大？">
+      <SortableTable C={c}
+        headers={["變數名稱", "測試次數", "平均CTR差距", "勝敗比", "狀態", "結論摘要"]}
+        dataKeys={["type", "count", "avgGap", null, null, null]}
+        defaultSortKey="avgGap"
+        data={varStats}
+        renderRow={(v, i) => {
+          const conf = VAR_CONCLUSIONS[v.type];
+          const statusColor = conf?.confidence === "穩固" ? c.green : (conf?.confidence === "需再測" || conf?.confidence === "累積中") ? c.coral : c.textDim;
+          const statusText = conf?.confidence === "穩固" ? "穩固" : (conf?.confidence === "需再測" || conf?.confidence === "累積中") ? "需再測" : "未測試";
+          const conclusionFull = conf?.conclusion || "-";
+          const conclusionShort = conclusionFull.length > 18 ? conclusionFull.slice(0, 18) + "..." : conclusionFull;
+          return (
+            <tr key={v.type} style={{ borderBottom: `1px solid ${c.border}` }}>
+              <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500, fontSize: 12 }}>{v.type}</td>
+              <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.text, fontSize: 12 }}>{v.count}</td>
+              <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.accent, fontWeight: 600, fontSize: 12 }}>{v.avgGap}%</td>
+              <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.text }}>A:{v.wins.A} B:{v.wins.B}</td>
+              <td style={{ padding: "12px 14px", fontSize: 11 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: statusColor, display: "inline-block" }} />
+                  <span style={{ color: statusColor }}>{statusText}</span>
+                </span>
+              </td>
+              <td style={{ padding: "12px 14px", fontSize: 11, color: c.textMuted, maxWidth: 200 }}>
+                <Tip text={conclusionFull} C={c} inline><span style={{ cursor: "default" }}>{conclusionShort}</span></Tip>
+              </td>
+            </tr>
+          );
+        }}
+      />
+    </Section>
+
+    {/* Suggestions */}
     {suggBlocks.length > 0 && (
       <Section title="未來 AB Test 建議" sub="根據歷史數據推導的下一步方向">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-          {suggBlocks.map(b => (
-            <Card key={b.title} C={c} style={{ borderTop: `3px solid ${b.color}` }}>
-              <div style={{ color: b.color, fontSize: 14, fontWeight: 600, marginBottom: 14 }}>{b.title}</div>
-              {b.items.map((item, j) => (
-                <div key={j} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-                  <span style={{ color: b.color, fontSize: 8, marginTop: 5 }}>●</span>
-                  <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{item}</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {suggBlocks.map(b => {
+            const isOpen = openSuggBlock === b.title;
+            return (
+              <Card key={b.title} C={c} style={{ borderTop: `3px solid ${b.color}` }}>
+                <div onClick={() => setOpenSuggBlock(isOpen ? null : b.title)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}>
+                  <div style={{ color: b.color, fontSize: 14, fontWeight: 600 }}>{b.title}</div>
+                  <span style={{ fontSize: 11, color: c.textMuted }}>{isOpen ? "▲ 收起" : `▼ ${b.items.length} 項`}</span>
                 </div>
-              ))}
-            </Card>
-          ))}
+                {isOpen && (
+                  <div style={{ marginTop: 12 }}>
+                    {b.items.map((item, j) => (
+                      <div key={j} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                        <span style={{ color: b.color, fontSize: 8, marginTop: 5 }}>●</span>
+                        <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
       </Section>
     )}
+
+    {/* Floating Checklist Button */}
+    <button onClick={() => setChecklistVisible(!checklistVisible)} style={{
+      position: "fixed", bottom: 24, right: 24, zIndex: 1000,
+      width: 48, height: 48, borderRadius: "50%",
+      background: c.accent, color: "#fff", border: "none",
+      cursor: "pointer", fontSize: 18, fontWeight: 700,
+      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      transition: "transform 0.2s",
+      transform: checklistVisible ? "rotate(45deg)" : "none",
+    }}>+</button>
+
+    {/* Slide-in Checklist Panel */}
+    <div style={{
+      position: "fixed", top: 0, right: 0, bottom: 0,
+      width: 340, zIndex: 5000,
+      background: c.card, borderLeft: `1px solid ${c.border}`,
+      boxShadow: checklistVisible ? "-4px 0 24px rgba(0,0,0,0.2)" : "none",
+      transform: checklistVisible ? "translateX(0)" : "translateX(100%)",
+      transition: "transform 0.3s ease",
+      padding: "24px 20px", overflowY: "auto",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: c.text }}>文案寫作 Checklist</div>
+        <button onClick={() => setChecklistVisible(false)} style={{
+          background: "none", border: "none", color: c.textMuted,
+          cursor: "pointer", fontSize: 18, padding: 4,
+        }}>X</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {[
+          "有沒有「就是在說我」的共感入口？",
+          "是否只測一個變數？（其他條件一致）",
+          "有沒有避開質問語氣（「你想___？」）？",
+          "有沒有避開年齡/身份篩選詞？",
+          "如果用恐懼，有沒有搭配資訊缺口或出路？",
+          "如果用金額，是具體數字還是抽象倍數？",
+          "方法論名詞有沒有太早揭露？",
+          "健康題材有沒有用多痛點策略？",
+          "整體調性是溫暖共感還是冷硬恐嚇？（偏前者）",
+          "能不能讓 45-64 歲的觀眾看 0.5 秒就覺得「跟我有關」？",
+          "用語有沒有太年輕化？（45-64 歲佔 57%）",
+          "在手機小螢幕上能不能一眼看完？（58% 手機觀看）",
+        ].map((item, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <span style={{ color: c.accent, fontSize: 8, marginTop: 5 }}>●</span>
+            <span style={{ color: c.textMuted, fontSize: 12, lineHeight: 1.6 }}>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   </div>);
 }
 
