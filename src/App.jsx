@@ -117,7 +117,8 @@ async function loadFromSheets() {
         copyA, copyB,
         ctrA: parsePct(r[col("A 點擊率")]), ctrB: parsePct(r[col("B 點擊率")]),
         winner: r[col("勝出版本")] || "",
-        frameA: r[col("A 情緒框架")] || "", frameB: r[col("B 情緒框架")] || "",
+        mainFrameA: r[col("A主要情緒框架")] || "", frameA: r[col("A 情緒框架")] || "",
+        mainFrameB: r[col("B主要情緒框架")] || "", frameB: r[col("B 情緒框架")] || "",
         testVar: r[col("測試變數")] || "",
         angleA: r[col("A 設計脈絡")] || "", angleB: r[col("B 設計脈絡")] || "",
         topicAngleA: r[col("A 議題角度")] || "", topicAngleB: r[col("B 議題角度")] || "",
@@ -826,7 +827,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
   const frameStats = useMemo(() => {
     const map = {};
     abTests.forEach(t => {
-      [{ frame: t.frameA, ctr: t.ctrA, won: t.winner === "A", ep: t.ep, show: t.show }, { frame: t.frameB, ctr: t.ctrB, won: t.winner === "B", ep: t.ep, show: t.show }].forEach(({ frame, ctr, won, ep, show }) => {
+      [{ frame: t.mainFrameA || t.frameA, ctr: t.ctrA, won: t.winner === "A", ep: t.ep, show: t.show }, { frame: t.mainFrameB || t.frameB, ctr: t.ctrB, won: t.winner === "B", ep: t.ep, show: t.show }].forEach(({ frame, ctr, won, ep, show }) => {
         if (!map[frame]) map[frame] = { frame, totalCTR: 0, count: 0, wins: 0, eps: [] };
         map[frame].totalCTR += ctr; map[frame].count++; if (won) map[frame].wins++;
         map[frame].eps.push(`${show} ${ep}｜${t.title}`);
