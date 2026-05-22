@@ -211,13 +211,17 @@ function processVideos(rawVideos, cfg = {}) {
 function fmt(n) { return n >= 10000 ? (n/10000).toFixed(1) + "萬" : n >= 1000 ? (n/1000).toFixed(1) + "K" : String(n); }
 
 // ── Sortable Table ──
-function SortableTable({ headers, dataKeys, data, renderRow, C, defaultSortKey, defaultSortDir = "desc", maxHeight }) {
+function SortableTable({ headers, dataKeys, data, renderRow, C, defaultSortKey, defaultSortDir = "desc", maxHeight, pageSize }) {
   const [sortKey, setSortKey] = useState(defaultSortKey || null);
   const [sortDir, setSortDir] = useState(defaultSortDir);
+  const [page, setPage] = useState(0);
+
+  useEffect(() => setPage(0), [data]);
 
   const handleSort = (key) => {
     if (sortKey === key) { setSortDir(d => d === "asc" ? "desc" : "asc"); }
     else { setSortKey(key); setSortDir("desc"); }
+    setPage(0);
   };
 
   const sorted = useMemo(() => {
@@ -230,36 +234,51 @@ function SortableTable({ headers, dataKeys, data, renderRow, C, defaultSortKey, 
     });
   }, [data, sortKey, sortDir]);
 
+  const totalPages = pageSize ? Math.ceil(sorted.length / pageSize) : 1;
+  const displayed = pageSize ? sorted.slice(page * pageSize, (page + 1) * pageSize) : sorted;
+
   return (
-    <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "auto", maxHeight: maxHeight || "none" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-        <thead><tr style={{ borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 2 }}>
-          {headers.map((h, i) => {
-            const key = dataKeys[i];
-            const active = sortKey === key;
-            return (
-              <th key={h} onClick={() => key && handleSort(key)} style={{
-                padding: "12px 14px", textAlign: "left", fontWeight: 500, fontSize: 10,
-                textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap",
-                cursor: key ? "pointer" : "default", userSelect: "none", transition: "background 0.15s",
-                color: active ? C.accent : C.textMuted,
-                background: active ? C.sortHover : C.card,
-              }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {h}
-                  {key && (
-                    <span style={{ display: "inline-flex", flexDirection: "column", lineHeight: 0, fontSize: 8, opacity: active ? 1 : 0.3 }}>
-                      <span style={{ color: active && sortDir === "asc" ? C.accent : C.textDim }}>▲</span>
-                      <span style={{ color: active && sortDir === "desc" ? C.accent : C.textDim, marginTop: -2 }}>▼</span>
-                    </span>
-                  )}
-                </span>
-              </th>
-            );
-          })}
-        </tr></thead>
-        <tbody>{sorted.map((row, i) => renderRow(row, i))}</tbody>
-      </table>
+    <div>
+      <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "auto", maxHeight: maxHeight || "none" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead><tr style={{ borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 2 }}>
+            {headers.map((h, i) => {
+              const key = dataKeys[i];
+              const active = sortKey === key;
+              return (
+                <th key={h} onClick={() => key && handleSort(key)} style={{
+                  padding: "12px 14px", textAlign: "left", fontWeight: 500, fontSize: 10,
+                  textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap",
+                  cursor: key ? "pointer" : "default", userSelect: "none", transition: "background 0.15s",
+                  color: active ? C.accent : C.textMuted,
+                  background: active ? C.sortHover : C.card,
+                }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    {h}
+                    {key && (
+                      <span style={{ display: "inline-flex", flexDirection: "column", lineHeight: 0, fontSize: 8, opacity: active ? 1 : 0.3 }}>
+                        <span style={{ color: active && sortDir === "asc" ? C.accent : C.textDim }}>▲</span>
+                        <span style={{ color: active && sortDir === "desc" ? C.accent : C.textDim, marginTop: -2 }}>▼</span>
+                      </span>
+                    )}
+                  </span>
+                </th>
+              );
+            })}
+          </tr></thead>
+          <tbody>{displayed.map((row, i) => renderRow(row, i))}</tbody>
+        </table>
+      </div>
+      {pageSize && totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 12 }}>
+          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px", cursor: page === 0 ? "default" : "pointer", color: page === 0 ? C.textDim : C.text, fontSize: 12 }}>◀</button>
+          {Array.from({ length: totalPages }, (_, i) => (
+            <button key={i} onClick={() => setPage(i)} style={{ background: page === i ? C.accent : "none", border: `1px solid ${page === i ? C.accent : C.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: page === i ? "#fff" : C.textMuted, fontSize: 12, fontWeight: page === i ? 600 : 400, minWidth: 32 }}>{i + 1}</button>
+          ))}
+          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px", cursor: page === totalPages - 1 ? "default" : "pointer", color: page === totalPages - 1 ? C.textDim : C.text, fontSize: 12 }}>▶</button>
+          <span style={{ fontSize: 11, color: C.textDim, marginLeft: 4 }}>{page * pageSize + 1}–{Math.min((page + 1) * pageSize, sorted.length)} / {sorted.length}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -941,7 +960,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
         const winnerFrame = t.winner === "A" ? `${t.mainFrameA || ""} ${t.frameA || ""}` : `${t.mainFrameB || ""} ${t.frameB || ""}`;
         return keywords.some(k => winnerFrame.toLowerCase().includes(k.toLowerCase()));
       });
-      return { name, color, desc, count: matched.length, wins: wins.length, winRate: matched.length > 0 ? Math.round(wins.length / matched.length * 100) : 0, eps: matched.map(t => `▸ ${t.show} ${t.ep}｜${t.title}`) };
+      return { name, color, desc, count: matched.length, wins: wins.length, winRate: matched.length > 0 ? Math.round(wins.length / matched.length * 100) : 0, eps: matched.map(t => `▸ ${t.show} ${t.ep}｜${t.title}`), tests: matched };
     });
   }, [abTests, formulaDefs]);
 
@@ -963,7 +982,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
             <CartesianGrid strokeDasharray="3 3" stroke={c.border} />
             <XAxis dataKey="ep" stroke={c.textDim} fontSize={10} />
             <YAxis stroke={c.textDim} fontSize={11} unit="%" />
-            <Tooltip content={({ active, payload }) => {
+            <Tooltip wrapperStyle={{ zIndex: 9999 }} content={({ active, payload }) => {
               if (!active || !payload?.[0]) return null;
               const d = payload[0].payload;
               return <div style={{ ...TT(c), padding: "10px 12px", maxWidth: 260, pointerEvents: "none" }}>
@@ -1018,18 +1037,20 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
     <Section title="四大文案公式" sub="共感金句型 ・ 知識缺口型 ・ 損失轉折型 ・ 多痛點集合型">
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {formulaStats.map(f => (
-          <Card key={f.name} C={c} style={{ flex: "1 1 180px", minWidth: 170, borderLeft: `3px solid ${f.color}` }}>
-            <div style={{ color: f.color, fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{f.name}</div>
-            <div style={{ color: c.textDim, fontSize: 10, marginBottom: 10 }}>{f.desc}</div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ color: c.textMuted, fontSize: 11 }}>出現次數</span>
-              <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}><Tip text={f.eps.join("\n")} C={c} inline>{f.count}</Tip></span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: c.textMuted, fontSize: 11 }}>勝率</span>
-              <span style={{ color: f.winRate >= 50 ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{f.winRate}%</span>
-            </div>
-          </Card>
+          <ABCardTip key={f.name} tests={f.tests} C={c}>
+            <Card C={c} style={{ flex: "1 1 180px", minWidth: 170, borderLeft: `3px solid ${f.color}`, cursor: "default" }}>
+              <div style={{ color: f.color, fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{f.name}</div>
+              <div style={{ color: c.textDim, fontSize: 10, marginBottom: 10 }}>{f.desc}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ color: c.textMuted, fontSize: 11 }}>出現次數</span>
+                <span style={{ color: c.text, fontFamily: "'JetBrains Mono', monospace" }}>{f.count}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: c.textMuted, fontSize: 11 }}>勝率</span>
+                <span style={{ color: f.winRate >= 50 ? c.green : c.textMuted, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{f.winRate}%</span>
+              </div>
+            </Card>
+          </ABCardTip>
         ))}
       </div>
     </Section>
@@ -1088,7 +1109,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
           </div>
         </div>
       </div>
-      <SortableTable C={c}
+      <SortableTable C={c} pageSize={8}
         headers={["集數", "節目", "測試變數", "A 文案", "B 文案", "CTR 對比", "差距", "勝出", ""]}
         dataKeys={["ep", "show", "testVar", "copyA", "copyB", null, "gap", "winner", null]}
         data={abTests.filter(t => {
@@ -1187,7 +1208,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
 
     {/* Test Variable Analysis */}
     <Section title="測試變數效益分析" sub="議題包裝 vs 情緒框架 vs 混合，哪種測試方向 CTR 差距最大？">
-      <SortableTable C={c}
+      <SortableTable C={c} maxHeight="480px"
         headers={["變數名稱", "測試次數", "平均CTR差距", "勝敗比", "狀態", "結論摘要"]}
         dataKeys={["type", "count", "avgGap", null, null, null]}
         defaultSortKey="avgGap"
@@ -1201,7 +1222,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
           return (
             <tr key={v.type} style={{ borderBottom: `1px solid ${c.border}` }}>
               <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500, fontSize: 12 }}>{v.type}</td>
-              <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.text, fontSize: 12 }}><Tip text={v.eps.join("\n")} C={c} inline>{v.count}</Tip></td>
+              <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.text, fontSize: 12 }}><ABCardTip tests={v.tests} C={c}><span style={{ cursor: "default" }}>{v.count}</span></ABCardTip></td>
               <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", color: c.accent, fontWeight: 600, fontSize: 12 }}>{v.avgGap}%</td>
               <td style={{ padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.text }}>A:{v.wins.A} B:{v.wins.B}</td>
               <td style={{ padding: "12px 14px", fontSize: 11 }}>
