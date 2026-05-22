@@ -111,6 +111,7 @@ async function loadFromSheets() {
     const copyA = r[col("縮圖文案 A")], copyB = r[col("縮圖文案 B")];
     if (copyA && copyB) {
       abTests.push({
+        id: id, title: r[col("影片標題")] || "",
         ep: r[col("集數")] || "", show: r[col("節目名稱")] || "", date: r[col("上架時間")] || "",
         topic: r[col("選題類別")] || r[col("選題大類")] || "",
         copyA, copyB,
@@ -294,6 +295,22 @@ function Tip({ text, children, C: c, inline }) {
         </div>
       )}
     </Tag>
+  );
+}
+
+function VideoPreviewTip({ id, title, date, children, C: c }) {
+  const [pos, setPos] = useState(null);
+  return (
+    <span onMouseEnter={e => setPos({ x: e.clientX, y: e.clientY })} onMouseMove={e => setPos({ x: e.clientX, y: e.clientY })} onMouseLeave={() => setPos(null)} style={{ cursor: "default" }}>
+      {children}
+      {pos && id && (
+        <div style={{ position: "fixed", left: Math.min(pos.x + 12, window.innerWidth - 280), top: Math.max(pos.y - 180, 10), zIndex: 9999, background: c.card, border: `1px solid ${c.border}`, borderRadius: 8, padding: 6, boxShadow: "0 8px 24px rgba(0,0,0,0.4)", pointerEvents: "none" }}>
+          <img src={`https://img.youtube.com/vi/${id}/mqdefault.jpg`} alt="" style={{ width: 240, borderRadius: 4, display: "block" }} />
+          <div style={{ fontSize: 11, color: c.text, marginTop: 4, maxWidth: 240, whiteSpace: "normal", fontWeight: 500 }}>{title}</div>
+          {date && <div style={{ fontSize: 10, color: c.textMuted, marginTop: 2 }}>{date}</div>}
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -891,7 +908,7 @@ function ABTab({ abTests, abSuggestions, C: c }) {
           const isExpanded = expandedRow === t.ep;
           return [
             <tr key={t.ep} style={{ borderBottom: isExpanded ? "none" : `1px solid ${c.border}`, background: isExpanded ? c.sortHover : "transparent", transition: "background 0.15s" }}>
-              <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500 }}><Tip text={t.date} C={c} inline>{t.ep}</Tip></td>
+              <td style={{ padding: "12px 14px", color: c.text, fontWeight: 500 }}><VideoPreviewTip id={t.id} title={t.title} date={t.date} C={c}>{t.ep}</VideoPreviewTip></td>
               <td style={{ padding: "12px 14px" }}><Tag text={t.show} color={c.colors6[SHOWS.indexOf(t.show) % 6]} C={c} /></td>
               <td style={{ padding: "12px 14px" }}><Tip text={`A: ${t.topicAngleA || t.angleA || t.frameA}\nB: ${t.topicAngleB || t.angleB || t.frameB}`} C={c} inline><Tag text={t.testVar} color={t.testVar === "情緒框架" ? c.purple : t.testVar === "議題包裝" ? c.teal : c.coral} C={c} /></Tip></td>
               <td style={{ padding: "12px 14px", color: t.winner === "A" ? c.green : c.textMuted, fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Tip text={t.copyA} C={c} inline>{t.copyA}</Tip></td>
