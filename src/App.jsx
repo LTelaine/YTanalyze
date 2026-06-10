@@ -26,7 +26,7 @@ const themes = {
 // ── Data ──
 const SHEET_ID = "10Eh6MhCHdcDFi-d1WHbYJS_sbsSUkxNctDNcc3kum9Y";
 const TABS = ["總覽", "商機指標", "12類選題", "A/B 文案", "TA 輪廓", "來賓效應", "收益", "TA 議題", "行動建議"];
-const SHOWS = ["全部", "授ㄉㄟ私捏", "防詐特攻隊", "醫起好健康"];
+const SHOWS = ["全部", "醍醐WAY", "防詐特攻隊", "醫起好健康", "人生叔成班", "學姊Better me"];
 
 function parseCSV(text) {
   const rows = [];
@@ -872,13 +872,13 @@ function TopicTab({ fullVideos, C: c }) {
 
 // ── AB Test Fallback Data ──
 const FALLBACK_AB_TESTS = [
-  { ep:"EP209", show:"授ㄉㄟ私捏", topic:"法律與社會案件", copyA:"200萬訂閱一夕歸零？創作者必看", copyB:"沒看懂「這條款」恐賠掉整個頻道", ctrA:3.8, ctrB:4.5, winner:"B", frameA:"實用承諾", frameB:"好奇懸念", testVar:"情緒框架", angleA:"法律知識提醒", angleB:"風險恐懼切入", conclusion:"好奇懸念的「恐賠掉」比實用提醒更能引發點擊衝動", suggestion:"法律類持續用好奇懸念包裝風險" },
+  { ep:"EP209", show:"醍醐WAY", topic:"法律與社會案件", copyA:"200萬訂閱一夕歸零？創作者必看", copyB:"沒看懂「這條款」恐賠掉整個頻道", ctrA:3.8, ctrB:4.5, winner:"B", frameA:"實用承諾", frameB:"好奇懸念", testVar:"情緒框架", angleA:"法律知識提醒", angleB:"風險恐懼切入", conclusion:"好奇懸念的「恐賠掉」比實用提醒更能引發點擊衝動", suggestion:"法律類持續用好奇懸念包裝風險" },
   { ep:"EP210", show:"防詐特攻隊", topic:"法律與社會案件", copyA:"轉貼迷因小心觸法！律師教你避雷", copyB:"你天天在做卻不知道違法！", ctrA:4.2, ctrB:5.6, winner:"B", frameA:"權威背書", frameB:"好奇懸念", testVar:"情緒框架", angleA:"律師專業提醒", angleB:"日常行為反差", conclusion:"「你天天在做」製造認知衝突，比律師背書更有吸引力", suggestion:"日常行為 + 違法反差是高 CTR 公式" },
-  { ep:"EP213", show:"授ㄉㄟ私捏", topic:"理財與房產", copyA:"ETF 四大種類完整解析", copyB:"做好本業、放下企圖心，資產佛系增長", ctrA:5.1, ctrB:6.3, winner:"B", frameA:"實用承諾", frameB:"好奇懸念", testVar:"議題包裝", angleA:"教學型：ETF分類", angleB:"心態型：佛系理財", conclusion:"同樣好奇框架，心態故事比教學分類更吸引 45-54 TA", suggestion:"理財類用「心態轉變」包裝比「工具教學」好" },
-  { ep:"EP214", show:"授ㄉㄟ私捏", topic:"理財與房產", copyA:"股怪教授的全自動躺平投資術", copyB:"100萬變1300萬？20年翻13倍的秘密", ctrA:4.8, ctrB:6.9, winner:"B", frameA:"權威背書", frameB:"好奇懸念", testVar:"混合", angleA:"教授專業推薦", angleB:"具體數字誘因", conclusion:"具體金額（100萬→1300萬）比專家頭銜更能驅動點擊", suggestion:"理財類標題一定要有具體數字" },
-  { ep:"EP215", show:"授ㄉㄟ私捏", topic:"心理與自我成長", copyA:"蔡康永情商課嘉賓教你高敏感生存法", copyB:"高敏感是一種病？什麼都沒做就好內耗", ctrA:5.2, ctrB:7.1, winner:"B", frameA:"權威背書", frameB:"好奇懸念", testVar:"情緒框架", angleA:"名人背書", angleB:"症狀自我檢測", conclusion:"「是一種病？」引發自我檢視比名人推薦更能觸發點擊", suggestion:"心理類用「你是不是也…」的自我檢測句式" },
-  { ep:"EP216", show:"授ㄉㄟ私捏", topic:"心理與自我成長", copyA:"身心科醫師教你2招救回職場內耗", copyB:"大腦天生不是讓你快樂！越努力越焦慮？", ctrA:5.5, ctrB:7.8, winner:"B", frameA:"實用承諾", frameB:"好奇懸念", testVar:"混合", angleA:"解決方案導向", angleB:"認知顛覆", conclusion:"「大腦天生不是讓你快樂」顛覆認知，比承諾解法更有衝擊力", suggestion:"心理類用認知顛覆開頭，解法放在影片內" },
-  { ep:"EP217", show:"授ㄉㄟ私捏", topic:"科技與科學", copyA:"LINE前總經理談AI時代的品味與效率", copyB:"AI時代，45+才是最強大腦！效能增加100倍", ctrA:4.6, ctrB:5.8, winner:"B", frameA:"權威背書", frameB:"好奇懸念", testVar:"議題包裝", angleA:"人物專訪角度", angleB:"年齡賦能角度", conclusion:"「45+才是最強大腦」精準打中 TA 年齡焦慮，比人物訪談更有代入感", suggestion:"科技類用 TA 年齡賦能比人物背書有效" },
+  { ep:"EP213", show:"醍醐WAY", topic:"理財與房產", copyA:"ETF 四大種類完整解析", copyB:"做好本業、放下企圖心，資產佛系增長", ctrA:5.1, ctrB:6.3, winner:"B", frameA:"實用承諾", frameB:"好奇懸念", testVar:"議題包裝", angleA:"教學型：ETF分類", angleB:"心態型：佛系理財", conclusion:"同樣好奇框架，心態故事比教學分類更吸引 45-54 TA", suggestion:"理財類用「心態轉變」包裝比「工具教學」好" },
+  { ep:"EP214", show:"醍醐WAY", topic:"理財與房產", copyA:"股怪教授的全自動躺平投資術", copyB:"100萬變1300萬？20年翻13倍的秘密", ctrA:4.8, ctrB:6.9, winner:"B", frameA:"權威背書", frameB:"好奇懸念", testVar:"混合", angleA:"教授專業推薦", angleB:"具體數字誘因", conclusion:"具體金額（100萬→1300萬）比專家頭銜更能驅動點擊", suggestion:"理財類標題一定要有具體數字" },
+  { ep:"EP215", show:"醍醐WAY", topic:"心理與自我成長", copyA:"蔡康永情商課嘉賓教你高敏感生存法", copyB:"高敏感是一種病？什麼都沒做就好內耗", ctrA:5.2, ctrB:7.1, winner:"B", frameA:"權威背書", frameB:"好奇懸念", testVar:"情緒框架", angleA:"名人背書", angleB:"症狀自我檢測", conclusion:"「是一種病？」引發自我檢視比名人推薦更能觸發點擊", suggestion:"心理類用「你是不是也…」的自我檢測句式" },
+  { ep:"EP216", show:"醍醐WAY", topic:"心理與自我成長", copyA:"身心科醫師教你2招救回職場內耗", copyB:"大腦天生不是讓你快樂！越努力越焦慮？", ctrA:5.5, ctrB:7.8, winner:"B", frameA:"實用承諾", frameB:"好奇懸念", testVar:"混合", angleA:"解決方案導向", angleB:"認知顛覆", conclusion:"「大腦天生不是讓你快樂」顛覆認知，比承諾解法更有衝擊力", suggestion:"心理類用認知顛覆開頭，解法放在影片內" },
+  { ep:"EP217", show:"醍醐WAY", topic:"科技與科學", copyA:"LINE前總經理談AI時代的品味與效率", copyB:"AI時代，45+才是最強大腦！效能增加100倍", ctrA:4.6, ctrB:5.8, winner:"B", frameA:"權威背書", frameB:"好奇懸念", testVar:"議題包裝", angleA:"人物專訪角度", angleB:"年齡賦能角度", conclusion:"「45+才是最強大腦」精準打中 TA 年齡焦慮，比人物訪談更有代入感", suggestion:"科技類用 TA 年齡賦能比人物背書有效" },
   { ep:"EP15", show:"防詐特攻隊", topic:"法律與社會案件", copyA:"外籍移工詐騙新手法！三招自保SOP", copyB:"外籍移工竟跟詐騙集團一夥！雇主如何自保？", ctrA:5.0, ctrB:7.2, winner:"B", frameA:"實用承諾", frameB:"好奇懸念", testVar:"情緒框架", angleA:"SOP教學", angleB:"揭秘震驚", conclusion:"「竟跟詐騙集團一夥」的震驚感比 SOP 教學更能引發好奇", suggestion:"防詐類用揭秘+震驚感開頭" },
   { ep:"EP17", show:"防詐特攻隊", topic:"法律與社會案件", copyA:"被詐騙千萬的自救指南", copyB:"堪比八點檔！遭閨密背叛、慘被詐騙千萬", ctrA:5.3, ctrB:8.4, winner:"B", frameA:"實用承諾", frameB:"情感共鳴", testVar:"混合", angleA:"教學自救", angleB:"八點檔故事", conclusion:"「堪比八點檔」的故事張力 + 背叛元素引發強烈情感共鳴，CTR 差距最大（3.1%）", suggestion:"真實故事型防詐影片用戲劇化包裝，CTR 天花板最高" },
 ];
@@ -888,6 +888,11 @@ function ABListModal({ tests, title, onClose, C: c }) {
   const [open, setOpen] = useState(false);
   useEffect(() => { requestAnimationFrame(() => setOpen(true)); }, []);
   const handleClose = () => { setOpen(false); setTimeout(onClose, 300); };
+  const sorted = useMemo(() => [...(tests || [])].sort((a, b) => {
+    const na = parseInt((a.ep || "").replace(/\D/g, ""), 10) || 0;
+    const nb = parseInt((b.ep || "").replace(/\D/g, ""), 10) || 0;
+    return nb - na;
+  }), [tests]);
   return (
     <>
       <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 7999, background: "rgba(0,0,0,0.45)", opacity: open ? 1 : 0, transition: "opacity 0.3s ease" }} />
@@ -897,8 +902,8 @@ function ABListModal({ tests, title, onClose, C: c }) {
           <button onClick={handleClose} style={{ background: "none", border: "none", cursor: "pointer", color: c.textMuted, fontSize: 20, lineHeight: 1, padding: "0 4px" }}>✕</button>
         </div>
         <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 20 }}>
-          {(tests || []).map((t, i) => (
-            <div key={`${t.ep}-${i}`} style={{ borderBottom: i < tests.length - 1 ? `1px solid ${c.border}` : "none", paddingBottom: i < tests.length - 1 ? 20 : 0 }}>
+          {sorted.map((t, i) => (
+            <div key={`${t.ep}-${i}`} style={{ borderBottom: i < sorted.length - 1 ? `1px solid ${c.border}` : "none", paddingBottom: i < sorted.length - 1 ? 20 : 0 }}>
               {t.id && <img src={`https://img.youtube.com/vi/${t.id}/mqdefault.jpg`} alt="" style={{ width: "100%", borderRadius: 8, display: "block", marginBottom: 10 }} onError={e => { e.target.style.display = "none"; }} />}
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                 <span style={{ background: "#111", color: "#fff", borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 10, flexShrink: 0 }}>{i + 1}</span>
@@ -1147,7 +1152,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
         <div>
           <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 4, letterSpacing: "0.04em" }}>節目</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {["全部", "授ㄉㄟ私捏", "防詐特攻隊", "醫起好健康"].map(s => {
+            {SHOWS.map(s => {
               const active = abShowFilter === s;
               return <button key={s} onClick={() => setAbShowFilter(s)} style={{
                 background: active ? c.accent + "18" : "none",
@@ -1192,7 +1197,8 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
       </div>
       <SortableTable C={c} pageSize={8}
         headers={["集數", "節目", "測試變數", "A 文案", "B 文案", "CTR 對比", "差距", "勝出", ""]}
-        dataKeys={["ep", "show", "testVar", "copyA", "copyB", null, "gap", "winner", null]}
+        dataKeys={["epNum", "show", "testVar", "copyA", "copyB", null, "gap", "winner", null]}
+        defaultSortKey="epNum" defaultSortDir="desc"
         data={abTests.filter(t => {
           if (abShowFilter !== "全部" && t.show !== abShowFilter) return false;
           if (abFrameFilter !== "全部") {
@@ -1208,7 +1214,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
             if (!`${t.ep} ${t.show} ${t.title} ${t.copyA} ${t.copyB} ${t.conclusion} ${t.suggestion} ${t.testVar}`.toLowerCase().includes(kw)) return false;
           }
           return true;
-        }).map(t => ({ ...t, gap: +(t.ctrB - t.ctrA).toFixed(1) }))}
+        }).map(t => ({ ...t, epNum: parseInt((t.ep || "").replace(/\D/g, ""), 10) || 0, gap: +(t.ctrB - t.ctrA).toFixed(1) }))}
         renderRow={(t, i) => {
           const maxCTR = Math.max(t.ctrA, t.ctrB) || 1;
           const isExpanded = expandedRows.has(t.ep);
@@ -1784,8 +1790,8 @@ function RevenueTab({ fullVideos, C: c }) {
 }
 
 // ── Show color helper ──
-const SHOW_COLORS = (c) => ({ "授ㄉㄟ私捏": c.green, "防詐特攻隊": c.coral, "醫起好健康": c.blue });
-const SHOW_SHORT = { "授ㄉㄟ私捏": "授", "防詐特攻隊": "詐", "醫起好健康": "醫" };
+const SHOW_COLORS = (c) => ({ "醍醐WAY": c.green, "防詐特攻隊": c.coral, "醫起好健康": c.blue, "人生叔成班": c.purple, "學姊Better me": c.teal });
+const SHOW_SHORT = { "醍醐WAY": "醍", "防詐特攻隊": "詐", "醫起好健康": "醫", "人生叔成班": "叔", "學姊Better me": "學" };
 function fmtDateShort(dateStr) {
   if (!dateStr) return "";
   const m = dateStr.match(/(\d+)\/(\d+)\/(\d+)/);
@@ -1795,7 +1801,7 @@ function fmtDateShort(dateStr) {
 // ── Tab: TA Topic Analysis ──
 function TATopicTab({ fullVideos, C: c }) {
   const sc = SHOW_COLORS(c);
-  const showNames = ["授ㄉㄟ私捏", "防詐特攻隊", "醫起好健康"];
+  const showNames = ["醍醐WAY", "防詐特攻隊", "醫起好健康", "人生叔成班", "學姊Better me"];
   const mono = "'JetBrains Mono', monospace";
 
   // ─── 1. Data Highlights KPI ───
