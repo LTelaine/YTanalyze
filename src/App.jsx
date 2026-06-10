@@ -561,29 +561,43 @@ function MonthlyTrend({ fullVideos, C: c }) {
 
 // ── Tab: Overview ──
 function OverviewTab({ fullVideos, reachData, C: c }) {
-  const total = fullVideos.reduce((a, v) => ({ views: a.views + v.views, subs: a.subs + v.subs }), { views: 0, subs: 0 });
-  const avgCIdx = (fullVideos.reduce((a, v) => a + v.commercialIdx, 0) / fullVideos.length).toFixed(1);
+  const [overviewShowFilter, setOverviewShowFilter] = useState("全部");
+  const filtered = overviewShowFilter === "全部" ? fullVideos : fullVideos.filter(v => v.show === overviewShowFilter);
+  const total = filtered.reduce((a, v) => ({ views: a.views + v.views, subs: a.subs + v.subs }), { views: 0, subs: 0 });
+  const avgCIdx = filtered.length ? (filtered.reduce((a, v) => a + v.commercialIdx, 0) / filtered.length).toFixed(1) : "0";
 
-  const showStats = [...new Set(fullVideos.map(v => v.show).filter(Boolean))].map(s => {
-    const sv = fullVideos.filter(v => v.show === s);
+  const showStats = [...new Set(filtered.map(v => v.show).filter(Boolean))].map(s => {
+    const sv = filtered.filter(v => v.show === s);
     if (!sv.length) return null;
     return { show: s, count: sv.length, totalViews: sv.reduce((a, v) => a + v.views, 0), avgViews: Math.round(sv.reduce((a, v) => a + v.views, 0) / sv.length), totalSubs: sv.reduce((a, v) => a + v.subs, 0), avgInteract: +(sv.reduce((a, v) => a + v.interactRate, 0) / sv.length).toFixed(2), avgCommercial: +(sv.reduce((a, v) => a + v.commercialIdx, 0) / sv.length).toFixed(1) };
   }).filter(Boolean).sort((a, b) => b.totalViews - a.totalViews);
 
   const recentVideos = useMemo(() => {
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-    return fullVideos.filter(v => {
+    return filtered.filter(v => {
       if (!v.date) return false;
       return new Date(v.date.replace(/\//g, "-")) >= cutoff;
     }).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  }, [fullVideos]);
+  }, [filtered]);
   const [recentPage, setRecentPage] = useState(0);
   const recentPerPage = 10;
   const recentTotalPages = Math.max(1, Math.ceil(recentVideos.length / recentPerPage));
 
   return (<div>
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 14 }}>
+      {SHOWS.map(s => {
+        const active = overviewShowFilter === s;
+        return <button key={s} onClick={() => { setOverviewShowFilter(s); setRecentPage(0); }} style={{
+          background: active ? c.accent + "18" : "none",
+          border: `1px solid ${active ? c.accent : c.border}`,
+          borderRadius: 14, color: active ? c.accent : c.textMuted,
+          padding: "4px 12px", cursor: "pointer", fontSize: 11,
+          fontFamily: "'Noto Sans TC', sans-serif", transition: "all 0.15s",
+        }}>{s}</button>;
+      })}
+    </div>
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-      <KPI label="完整集" value={fullVideos.length} sub="不含 Shorts/Podcast" C={c} />
+      <KPI label="完整集" value={filtered.length} sub={overviewShowFilter === "全部" ? "不含 Shorts/Podcast" : overviewShowFilter} C={c} />
       <KPI label="總觀看" value={fmt(total.views)} C={c} />
       <KPI label="訂閱增長" value={`+${total.subs}`} color={c.green} C={c} />
       <KPI label="平均商機" value={avgCIdx} sub="滿分 10" color={c.accent} C={c} />
@@ -638,7 +652,7 @@ function OverviewTab({ fullVideos, reachData, C: c }) {
     <Section title="觀看數 Top 10" sub="所有時間 ・ 點擊欄位標題可排序 ・ 滑鼠移到標題可看完整文字">
       <SortableTable C={c} headers={["#", "節目", "集數", "標題", "流量來源", "觀看", "訂閱", "互動率", "商機"]}
         dataKeys={[null, "show", "ep", "title", "traffic", "views", "subs", "interactRate", "commercialIdx"]}
-        data={fullVideos} defaultSortKey="views" maxHeight={520}
+        data={filtered} defaultSortKey="views" maxHeight={520}
         renderRow={(v, i) => (
           <tr key={v.id} style={{ borderBottom: `1px solid ${c.border}` }}>
             <td style={{ padding: "10px 14px", color: c.textDim }}>{i + 1}</td>
@@ -654,8 +668,8 @@ function OverviewTab({ fullVideos, reachData, C: c }) {
         )}
       />
     </Section>
-    <ChannelFunnel fullVideos={fullVideos} reachData={reachData} C={c} />
-    <MonthlyTrend fullVideos={fullVideos} C={c} />
+    <ChannelFunnel fullVideos={filtered} reachData={reachData} C={c} />
+    <MonthlyTrend fullVideos={filtered} C={c} />
   </div>);
 }
 
