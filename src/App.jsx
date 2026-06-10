@@ -903,6 +903,7 @@ function ABListModal({ tests, title, onClose, C: c }) {
   useEffect(() => { requestAnimationFrame(() => setOpen(true)); }, []);
   const handleClose = () => { setOpen(false); setTimeout(onClose, 300); };
   const sorted = useMemo(() => [...(tests || [])].sort((a, b) => {
+    if (a.date && b.date) return (b.date || "").localeCompare(a.date || "");
     const na = parseInt((a.ep || "").replace(/\D/g, ""), 10) || 0;
     const nb = parseInt((b.ep || "").replace(/\D/g, ""), 10) || 0;
     return nb - na;
@@ -1000,7 +1001,7 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
     return Object.values(map).map(f => ({ ...f, avgCTR: +(f.totalCTR / f.count).toFixed(1), winRate: Math.round(f.wins / f.count * 100) })).sort((a, b) => b.winRate - a.winRate);
   }, []);
 
-  const frameColorMap = { "好奇懸念": c.accent, "恐懼損失": c.red, "實用承諾": c.blue, "權威背書": c.purple, "情感共鳴": c.pink, "社會認同": c.teal, "損失厭惡": c.red, "恐懼訴求": c.coral, "權威解答": c.purple, "權威揭密": c.purple, "利益驅動": c.teal, "共感釋放": c.pink };
+  const frameColorMap = { "好奇懸念": c.accent, "恐懼損失": c.red, "實用承諾": c.blue, "權威背書": c.purple, "情感共鳴": c.pink, "社會認同": c.teal, "損失厭惡": c.red, "恐懼訴求": c.coral, "權威解答": c.purple, "權威揭密": c.purple, "利益驅動": c.teal, "共感釋放": c.pink, "焦慮共感": c.red, "願景投射": c.teal, "情境代入": c.accent, "具體數字": c.coral, "身份認同": c.pink, "身份反差": c.purple };
 
   const trendData = useMemo(() => {
     return [...abTests].sort((a, b) => {
@@ -1031,6 +1032,10 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
     "框架方向": { conclusion: "正向解方 > 負向警告（差距小）", confidence: "需再測", color: c.coral },
     "恐懼來源": { conclusion: "知識落差 > 直接威脅", confidence: "需再測", color: c.coral },
     "恐懼類型": { conclusion: "原因懸念 > 結果衝擊", confidence: "需再測", color: c.coral },
+    "情緒訴求方向": { conclusion: "正向願景 ≈ 焦慮驅動（差距僅0.6%），退休主題兩種策略皆可", confidence: "需再測", color: c.coral },
+    "鉤子具體度": { conclusion: "情境關鍵字（網戀）> 具體金額（20萬），場景辨識度勝過數字", confidence: "需再測", color: c.coral },
+    "身份標籤": { conclusion: "具體人設（四寶媽）> 抽象標籤（高薪窮人），具體身份更易代入", confidence: "累積中", color: c.accent },
+    "議題關聯性": { conclusion: "個人切身後果 ≈ 社會議題質疑（差距僅0.8%）", confidence: "需再測", color: c.coral },
   };
 
   const formulaStats = useMemo(() => {
@@ -1038,9 +1043,10 @@ function ABTab({ abTests, abSuggestions, formulaDefs, C: c }) {
     const defs = formulaDefs?.length > 0
       ? formulaDefs.map((f, i) => ({ ...f, color: PALETTE[i % PALETTE.length] }))
       : [
-          { name: "共感金句型", keywords: ["共感釋放", "共感"], color: c.pink, desc: "日常OS + 後果暗示" },
-          { name: "知識缺口型", keywords: ["好奇懸念", "知識翻轉"], color: c.accent, desc: "熟悉場景 + 反常識" },
-          { name: "損失轉折型", keywords: ["損失厭惡", "背叛"], color: c.red, desc: "具體金額 + 轉折結果" },
+          { name: "共感金句型", keywords: ["共感釋放", "共感", "情感共鳴"], color: c.pink, desc: "日常OS + 後果暗示 + 故事共鳴" },
+          { name: "知識缺口型", keywords: ["好奇懸念", "知識翻轉", "情境代入"], color: c.accent, desc: "熟悉場景 + 反常識 + 情境聯想" },
+          { name: "損失焦慮型", keywords: ["損失厭惡", "背叛", "焦慮共感", "恐懼訴求"], color: c.red, desc: "具體金額 + 轉折結果 + 財務焦慮" },
+          { name: "利益願景型", keywords: ["利益驅動", "願景投射"], color: c.teal, desc: "正向承諾 + 自由感 + CP值反差" },
           { name: "多痛點集合型", keywords: ["多重痛點"], color: c.coral, desc: "痛點1 + 痛點2 + 痛點3" },
         ];
     return defs.map(({ name, keywords, color, desc }) => {
