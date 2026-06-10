@@ -26,7 +26,7 @@ const themes = {
 // ── Data ──
 const SHEET_ID = "10Eh6MhCHdcDFi-d1WHbYJS_sbsSUkxNctDNcc3kum9Y";
 const TABS = ["總覽", "商機指標", "12類選題", "A/B 文案", "TA 輪廓", "來賓效應", "收益", "TA 議題", "行動建議"];
-const SHOWS = ["全部", "醍醐WAY", "防詐特攻隊", "醫起好健康", "人生叔成班", "學姊Better me"];
+const SHOWS = ["全部", "防詐特攻隊", "醫起好健康", "人生叔成班", "學姊Better me"];
 
 function parseCSV(text) {
   const rows = [];
@@ -1804,8 +1804,8 @@ function RevenueTab({ fullVideos, C: c }) {
 }
 
 // ── Show color helper ──
-const SHOW_COLORS = (c) => ({ "醍醐WAY": c.green, "防詐特攻隊": c.coral, "醫起好健康": c.blue, "人生叔成班": c.purple, "學姊Better me": c.teal });
-const SHOW_SHORT = { "醍醐WAY": "醍", "防詐特攻隊": "詐", "醫起好健康": "醫", "人生叔成班": "叔", "學姊Better me": "學" };
+const SHOW_COLORS = (c) => ({ "防詐特攻隊": c.coral, "醫起好健康": c.blue, "人生叔成班": c.purple, "學姊Better me": c.teal });
+const SHOW_SHORT = { "防詐特攻隊": "詐", "醫起好健康": "醫", "人生叔成班": "叔", "學姊Better me": "學" };
 function fmtDateShort(dateStr) {
   if (!dateStr) return "";
   const m = dateStr.match(/(\d+)\/(\d+)\/(\d+)/);
@@ -1815,7 +1815,7 @@ function fmtDateShort(dateStr) {
 // ── Tab: TA Topic Analysis ──
 function TATopicTab({ fullVideos, C: c }) {
   const sc = SHOW_COLORS(c);
-  const showNames = ["醍醐WAY", "防詐特攻隊", "醫起好健康", "人生叔成班", "學姊Better me"];
+  const showNames = ["防詐特攻隊", "醫起好健康", "人生叔成班", "學姊Better me"];
   const mono = "'JetBrains Mono', monospace";
 
   // ─── 1. Data Highlights KPI ───
